@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestione Magazzino v3</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f3f5f7;color:#17202a}
+main{max-width:1800px;margin:auto;padding:24px}h1{margin:0 0 20px;font-size:30px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fff;border-radius:12px;padding:18px;box-shadow:0 1px 4px #0001}
+h3{margin:0 0 12px}.status{margin-top:10px;color:#555;font-size:14px}
+.toolbar{margin-top:16px;display:flex;gap:10px;align-items:center}.search{flex:1;padding:11px;border:1px solid #bbb;border-radius:8px;font-size:15px}
+.tablewrap{margin-top:16px;overflow:auto;max-height:70vh}.table{width:100%;border-collapse:collapse;background:#fff;font-size:13px}
+th,td{padding:8px;border-bottom:1px solid #ddd;white-space:nowrap}th{position:sticky;top:0;background:#eef1f4;z-index:2}.num{text-align:right}
+.qty{width:82px;padding:6px;border:1px solid #aaa;border-radius:6px;text-align:right}.ok{color:#17823b;font-weight:bold}.bad{color:#c62828;font-weight:bold}
+.note{margin-top:12px;font-size:13px;color:#666}.error{color:#b00020;font-weight:bold}
+@media(max-width:800px){main{padding:12px}.grid{grid-template-columns:1fr}h1{font-size:24px}}
+</style>
+</head>
+<body><main>
+<h1>Gestione Magazzino v3</h1>
+<div class="grid">
+ <div class="card"><h3>1. File Magazzino</h3><input id="magFile" type="file" accept=".xls,.xlsx,.xlsm"><div id="magStatus" class="status">Nessun file caricato</div></div>
+ <div class="card"><h3>2. Anagrafica SIZE</h3><input id="sizeFile" type="file" accept=".xls,.xlsx,.xlsm"><div id="sizeStatus" class="status">Nessun file caricato</div></div>
+</div>
+<div id="mainStatus" class="card" style="margin-top:16px">Carica entrambi i file.</div>
+<div class="card toolbar"><input id="search" class="search" placeholder="Cerca prodotto..."><span id="count"></span></div>
+<div class="card tablewrap"><table class="table"><thead><tr>
+<th>Codice</th><th>Prodotto</th><th>U.M.</th><th class="num">Iniziale</th><th class="num">Danni</th><th class="num">Venduto</th>
+<th class="num">BOX</th><th class="num">SLEEVE</th><th class="num">Sing.</th><th class="num">Atteso</th><th class="num">Effettivo</th><th class="num">Diff.</th>
+</tr></thead><tbody id="body"></tbody></table></div>
+<div class="note">Il file SIZE viene usato come anagrafica. Il file Magazzino viene letto secondo la struttura reale del report Historical - Stock Variance.</div>
+</main><script src="app.js"></script></body></html>
