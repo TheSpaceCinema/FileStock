@@ -6,12 +6,18 @@
 <title>Gestione Magazzino v3</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f3f5f7;color:#17202a}
-main{max-width:1800px;margin:auto;padding:20px}h1{margin:0 0 16px;font-size:26px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px #0001}
-h3{margin:0 0 10px;font-size:16px}.status{margin-top:8px;color:#555;font-size:13px}
-.toolbar{margin-top:16px;display:flex;gap:10px;align-items:center}.search{flex:1;padding:10px;border:1px solid #bbb;border-radius:8px;font-size:14px}
-.tablewrap{margin-top:16px;overflow:auto;max-height:72vh}.table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;margin:0;background:#f3f5f7;color:#17202a}
+main{max-width:1800px;margin:auto;padding:20px}
+h1{margin:0 0 16px;font-size:26px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px #0001}
+h3{margin:0 0 10px;font-size:16px}
+.status{margin-top:8px;color:#555;font-size:13px}
+.toolbar{margin-top:16px;display:flex;gap:10px;align-items:center}
+.search{flex:1;padding:10px;border:1px solid #bbb;border-radius:8px;font-size:14px}
+.tablewrap{margin-top:16px;overflow:auto;max-height:72vh}
+.table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
 th,td{padding:6px 8px;border-bottom:1px solid #ddd;white-space:nowrap}
 th{position:sticky;top:0;background:#eef1f4;z-index:2;border-right:1px solid #ccc;font-weight:600}
 .num{text-align:right}
@@ -19,8 +25,10 @@ th{position:sticky;top:0;background:#eef1f4;z-index:2;border-right:1px solid #cc
 .grp-sleeve{background:#d1e7dd!important}
 .grp-sfuso{background:#e2e3e5!important}
 .qty-input{width:65px;padding:4px 6px;border:1px solid #aaa;border-radius:4px;text-align:right;font-size:12px}
-.ok{color:#17823b;font-weight:bold}.bad{color:#c62828;font-weight:bold}
-.note{margin-top:12px;font-size:12px;color:#666}.error{color:#b00020;font-weight:bold}
+.ok{color:#17823b;font-weight:bold}
+.bad{color:#c62828;font-weight:bold}
+.note{margin-top:12px;font-size:12px;color:#666}
+.error{color:#b00020;font-weight:bold}
 @media(max-width:800px){main{padding:12px}.grid{grid-template-columns:1fr}}
 </style>
 </head>
