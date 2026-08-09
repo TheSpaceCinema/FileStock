@@ -106,23 +106,36 @@ function parseMag(m) {
 }
 
 function parseSize(m) {
+  // Cerca la riga di intestazione principale dove compare "PRODOTTO"
   let h = -1;
   for (let i = 0; i < m.length; i++) {
     if (m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
   }
-  if (h < 0) throw new Error("Colonna PRODOTTO non trovata nel file SIZE.");
-  
-  const head = m[h];
-  const p = findCol(head, "PRODOTTO");
-  const box = findCol(head, "BOX");
-  const sl = findCol(head, "SLEEVE");
-  const sg = findCol(head, "C.B. SINGOLO P.");
+  if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
+
+  // La riga successiva (h + 1) o la riga stessa contiene le sotto-intestazioni (Nome, Size, ecc.)
+  // Basandoci sugli indici di colonna visibili nell'immagine:
+  // Colonna 0: Nome del prodotto
+  // Colonna 2: BOX Size (es. 864, 720, 1000...)
+  // Colonna 5: SLEEVE Size (es. 24, 12, 50...)
+  // Colonna 8: SFUSO / Singolo (se presente o 1 di default)
   
   const out = [];
-  for (let i = h + 1; i < m.length; i++) {
-    const r = m[i], name = text(r[p]);
+  for (let i = h + 2; i < m.length; i++) {
+    const r = m[i];
+    const name = text(r[0]); // Colonna 'Nome'
     if (!name) continue;
-    out.push({ name, box: box >= 0 ? r[box] : "", sleeve: sl >= 0 ? r[sl] : "", sing: sg >= 0 ? r[sg] : "" });
+
+    const boxVal = text(r[2]);    // 'Size' sotto BOX
+    const sleeveVal = text(r[5]); // 'Size' sotto SLEEVE
+    const singVal = text(r[8]);   // 'Tot' o Size per Sfuso
+
+    out.push({
+      name,
+      box: boxVal && boxVal !== "#N/D" ? boxVal : "",
+      sleeve: sleeveVal && sleeveVal !== "#N/D" ? sleeveVal : "",
+      sing: singVal && singVal !== "#N/D" ? singVal : ""
+    });
   }
   return out;
 }
