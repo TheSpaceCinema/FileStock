@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const f = e.target.files[0];
     if (!f) return;
     $("sizeStatus").textContent = "Lettura anagrafica in corso...";
-    readMatrix(f).then(m => {
+    readMatrix(f, "SIZE").then(m => {
       size = parseSize(m);
       $("sizeStatus").textContent = `${f.name} — ${size.length} prodotti letti`;
       build();
@@ -34,7 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("search").addEventListener("input", render);
 });
 
-function readMatrix(file) {
+// Funzione di lettura foglio Excel potenziata
+function readMatrix(file, preferredSheetName = "") {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = e => {
@@ -44,7 +45,16 @@ function readMatrix(file) {
         }
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
         if (!wb.SheetNames.length) throw new Error("Nessun foglio trovato.");
-        resolve(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }));
+
+        // Cerca se esiste un foglio che contiene il nome cercato (es. "SIZE"), altrimenti prende il primo
+        let sheetName = wb.SheetNames[0];
+        if (preferredSheetName) {
+          const found = wb.SheetNames.find(s => norm(s).includes(norm(preferredSheetName)));
+          if (found) sheetName = found;
+        }
+
+        const sheet = wb.Sheets[sheetName];
+        resolve(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true }));
       } catch (x) { reject(x); }
     };
     r.onerror = () => reject(new Error("Impossibile leggere il file."));
@@ -94,8 +104,8 @@ function parseMag(m) {
 }
 
 function parseSize(m) {
-  // 1. Trova la riga di intestazione (quella nera con "PRODOTTO")
   let h = -1;
+  // Cerca la riga contenente "PRODOTTO"
   for (let i = 0; i < m.length; i++) {
     if (m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
   }
@@ -103,29 +113,27 @@ function parseSize(m) {
 
   const head = m[h];
   
-  // Trova dinamicamente gli indici delle colonne
-  let pCol = findCol(head, "PRODOTTO");
-  let boxCol = findCol(head, "BOX");
-  let sleeveCol = findCol(head, "SLEEVE");
+  // Trova gli indici di colonna esatti:
+  let pCol = head.findIndex(v => norm(v) === "PRODOTTO");
+  let boxCol = head.findIndex(v => norm(v) === "BOX");
+  let sleeveCol = head.findIndex(v => norm(v) === "SLEEVE");
 
-  // Fallback se le intestazioni hanno spazi extra o maiuscole/minuscole
-  if (pCol < 0) pCol = 1;      // Colonna B
-  if (boxCol < 0) boxCol = 2;  // Colonna C
-  if (sleeveCol < 0) sleeveCol = 3; // Colonna D
+  // Fallback sulle posizioni visibili nell'Excel (B=1, C=2, D=3)
+  if (pCol < 0) pCol = 1;      
+  if (boxCol < 0) boxCol = 2;  
+  if (sleeveCol < 0) sleeveCol = 3; 
 
   const out = [];
 
-  // 2. Legge i dati partendo dalla riga subito sotto l'intestazione
   for (let i = h + 1; i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
 
     const name = text(r[pCol]);
-    // Salta righe vuote o riepiloghi non validi
-    if (!name || name === "#N/D") continue;
+    if (!name || name === "#N/D" || norm(name) === "PRODOTTO") continue;
 
-    const boxVal = n(r[boxCol]);       // Dimensione BOX (es. 870)
-    const sleeveVal = n(r[sleeveCol]); // Dimensione SLEEVE (es. 6)
+    const boxVal = n(r[boxCol]);       
+    const sleeveVal = n(r[sleeveCol]); 
 
     out.push({
       name,
@@ -136,6 +144,7 @@ function parseSize(m) {
 
   return out;
 }
+
 function build() {
   if (!mag.length || !size.length) {
     $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> · SIZE: <b>${size.length}</b><br>Carica entrambi i file.`;
@@ -167,7 +176,6 @@ function render() {
   data.forEach(r => {
     const tr = document.createElement("tr");
     
-    // Calcolo iniziale effettivo
     const effettivo = (r.inputBox * r.boxSize) + (r.inputSleeve * r.sleeveSize) + r.inputSfuso;
     const diff = effettivo - r.atteso;
 
@@ -179,18 +187,14 @@ function render() {
       <td class="num">${fmt(r.danni)}</td>
       <td class="num">${fmt(r.venduto)}</td>
       
-      <!-- BOX -->
       <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
       <td class="num grp-box"><input class="qty-input in-box" type="number" step="any" min="0" value="${r.inputBox || ''}"></td>
       
-      <!-- SLEEVE -->
       <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
       <td class="num grp-sleeve"><input class="qty-input in-sleeve" type="number" step="any" min="0" value="${r.inputSleeve || ''}"></td>
       
-      <!-- SFUSO -->
       <td class="num grp-sfuso"><input class="qty-input in-sfuso" type="number" step="any" min="0" value="${r.inputSfuso || ''}"></td>
       
-      <!-- TOTALE E DIFFERENZA -->
       <td class="num">${fmt(r.atteso)}</td>
       <td class="num cell-eff">${fmt(effettivo)}</td>
       <td class="num cell-diff ${diff === 0 ? 'ok' : 'bad'}">${fmt(diff)}</td>
