@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="it">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Gestione Magazzino v3</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -17,17 +18,49 @@ th,td{padding:8px;border-bottom:1px solid #ddd;white-space:nowrap}th{position:st
 @media(max-width:800px){main{padding:12px}.grid{grid-template-columns:1fr}h1{font-size:24px}}
 </style>
 </head>
-<body><main>
-<h1>Gestione Magazzino v3</h1>
-<div class="grid">
- <div class="card"><h3>1. File Magazzino</h3><input id="magFile" type="file" accept=".xls,.xlsx,.xlsm"><div id="magStatus" class="status">Nessun file caricato</div></div>
- <div class="card"><h3>2. Anagrafica SIZE</h3><input id="sizeFile" type="file" accept=".xls,.xlsx,.xlsm"><div id="sizeStatus" class="status">Nessun file caricato</div></div>
-</div>
-<div id="mainStatus" class="card" style="margin-top:16px">Carica entrambi i file.</div>
-<div class="card toolbar"><input id="search" class="search" placeholder="Cerca prodotto..."><span id="count"></span></div>
-<div class="card tablewrap"><table class="table"><thead><tr>
-<th>Codice</th><th>Prodotto</th><th>U.M.</th><th class="num">Iniziale</th><th class="num">Danni</th><th class="num">Venduto</th>
-<th class="num">BOX</th><th class="num">SLEEVE</th><th class="num">Sing.</th><th class="num">Atteso</th><th class="num">Effettivo</th><th class="num">Diff.</th>
-</tr></thead><tbody id="body"></tbody></table></div>
-<div class="note">Il file SIZE viene usato come anagrafica. Il file Magazzino viene letto secondo la struttura reale del report Historical - Stock Variance.</div>
-</main><script src="app.js"></script></body></html>
+<body>
+<main>
+  <h1>Gestione Magazzino v3</h1>
+  <div class="grid">
+    <div class="card">
+      <h3>1. File Magazzino</h3>
+      <input id="magFile" type="file" accept=".xls,.xlsx,.xlsm">
+      <div id="magStatus" class="status">Nessun file caricato</div>
+    </div>
+    <div class="card">
+      <h3>2. Anagrafica SIZE</h3>
+      <input id="sizeFile" type="file" accept=".xls,.xlsx,.xlsm">
+      <div id="sizeStatus" class="status">Nessun file caricato</div>
+    </div>
+  </div>
+  <div id="mainStatus" class="card" style="margin-top:16px">Carica entrambi i file.</div>
+  <div class="card toolbar">
+    <input id="search" class="search" placeholder="Cerca prodotto...">
+    <span id="count"></span>
+  </div>
+  <div class="card tablewrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Codice</th>
+          <th>Prodotto</th>
+          <th>U.M.</th>
+          <th class="num">Iniziale</th>
+          <th class="num">Danni</th>
+          <th class="num">Venduto</th>
+          <th class="num">BOX</th>
+          <th class="num">SLEEVE</th>
+          <th class="num">Sing.</th>
+          <th class="num">Atteso</th>
+          <th class="num">Effettivo</th>
+          <th class="num">Diff.</th>
+        </tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+  <div class="note">Il file SIZE viene usato come anagrafica. Il file Magazzino viene letto secondo la struttura reale del report Historical - Stock Variance.</div>
+</main>
+<script src="app.js" defer></script>
+</body>
+</html>
