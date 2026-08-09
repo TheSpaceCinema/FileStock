@@ -34,19 +34,18 @@ document.addEventListener("DOMContentLoaded", () => {
   $("search").addEventListener("input", render);
 });
 
-// Funzione di lettura foglio Excel potenziata
+// Lettura dinamica dei fogli Excel con ricerca per nome scheda
 function readMatrix(file, preferredSheetName = "") {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = e => {
       try {
         if (typeof XLSX === "undefined") {
-          throw new Error("Libreria Excel non caricata. Controlla la connessione Internet.");
+          throw new Error("Libreria Excel non caricata. Verifica la connessione a internet.");
         }
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
         if (!wb.SheetNames.length) throw new Error("Nessun foglio trovato.");
 
-        // Cerca se esiste un foglio che contiene il nome cercato (es. "SIZE"), altrimenti prende il primo
         let sheetName = wb.SheetNames[0];
         if (preferredSheetName) {
           const found = wb.SheetNames.find(s => norm(s).includes(norm(preferredSheetName)));
@@ -78,19 +77,21 @@ function norm(v) {
   return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase();
 }
 
+// Lettura File Magazzino
 function parseMag(m) {
   let header = -1;
   for (let i = 0; i < m.length; i++) {
-    if (m[i].some(v => norm(v) === "OPENING BALANCE")) { header = i; break; }
+    if (m[i] && m[i].some(v => norm(v) === "OPENING BALANCE")) { header = i; break; }
   }
   if (header < 0) throw new Error("Intestazione 'Opening Balance' non trovata.");
   
   const out = [];
   for (let i = header + 1; i < m.length; i++) {
     const r = m[i];
+    if (!r) continue;
     const code = text(r[1]), uom = text(r[2]);
     if (!code || !uom) continue;
-    if (i + 1 >= m.length) continue;
+    if (i + 1 >= m.length || !m[i + 1]) continue;
     const name = text(m[i + 1][1]);
     if (!name) continue;
     
@@ -103,25 +104,23 @@ function parseMag(m) {
   return out;
 }
 
+// Lettura File SIZE basata sulla struttura reale dell'Excel
 function parseSize(m) {
   let h = -1;
-  // Cerca la riga contenente "PRODOTTO"
   for (let i = 0; i < m.length; i++) {
-    if (m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
+    if (m[i] && m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
   }
   if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
 
   const head = m[h];
   
-  // Trova gli indici di colonna esatti:
   let pCol = head.findIndex(v => norm(v) === "PRODOTTO");
   let boxCol = head.findIndex(v => norm(v) === "BOX");
   let sleeveCol = head.findIndex(v => norm(v) === "SLEEVE");
 
-  // Fallback sulle posizioni visibili nell'Excel (B=1, C=2, D=3)
-  if (pCol < 0) pCol = 1;      
-  if (boxCol < 0) boxCol = 2;  
-  if (sleeveCol < 0) sleeveCol = 3; 
+  if (pCol < 0) pCol = 1;      // Colonna B
+  if (boxCol < 0) boxCol = 2;  // Colonna C
+  if (sleeveCol < 0) sleeveCol = 3; // Colonna D
 
   const out = [];
 
