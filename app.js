@@ -104,23 +104,28 @@ function parseMag(m) {
   return out;
 }
 
-// Lettura File SIZE basata sulla struttura reale dell'Excel
 function parseSize(m) {
   let h = -1;
+  // Cerca la riga contenente la parola "PRODOTTO"
   for (let i = 0; i < m.length; i++) {
-    if (m[i] && m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
+    if (m[i] && m[i].some(v => norm(v) === "PRODOTTO")) { 
+      h = i; 
+      break; 
+    }
   }
   if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
 
   const head = m[h];
   
+  // Trova gli indici delle colonne dinamici
   let pCol = head.findIndex(v => norm(v) === "PRODOTTO");
   let boxCol = head.findIndex(v => norm(v) === "BOX");
   let sleeveCol = head.findIndex(v => norm(v) === "SLEEVE");
 
-  if (pCol < 0) pCol = 1;      // Colonna B
-  if (boxCol < 0) boxCol = 2;  // Colonna C
-  if (sleeveCol < 0) sleeveCol = 3; // Colonna D
+  // Fallback per il nuovo file (Colonna A=0, B=1, C=2)
+  if (pCol < 0) pCol = 0;      
+  if (boxCol < 0) boxCol = 1;  
+  if (sleeveCol < 0) sleeveCol = 2; 
 
   const out = [];
 
