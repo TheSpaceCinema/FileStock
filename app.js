@@ -95,19 +95,43 @@ function parseMag(m) {
 
 function parseSize(m) {
   let h = -1;
+  // Trova la riga d'intestazione "PRODOTTO"
   for (let i = 0; i < m.length; i++) {
     if (m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
   }
   if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
 
+  // Trova la riga con le sotto-intestazioni (Nome, Size, ecc.)
+  let subH = h + 1;
+  let nameCol = -1, boxCol = -1, sleeveCol = -1;
+
+  // Cerchiamo le colonne basandoci sulle etichette se presenti
+  for (let col = 0; col < m[subH].length; col++) {
+    const label = norm(m[subH][col]);
+    if (label === "NOME" || label === "PRODOTTO") nameCol = col;
+  }
+
+  // Se non trova l'etichetta "NOME", usa la prima colonna (0) di default
+  if (nameCol < 0) nameCol = 0;
+
+  // Indici fissi basati sulla struttura del file SIZE:
+  // Colonna Nome: 0 (o nameCol)
+  // Colonna BOX Size: 2
+  // Colonna SLEEVE Size: 5
+  boxCol = 2;
+  sleeveCol = 5;
+
   const out = [];
+  // Partiamo da due righe sotto l'intestazione "PRODOTTO"
   for (let i = h + 2; i < m.length; i++) {
     const r = m[i];
-    const name = text(r[0]);
-    if (!name) continue;
+    if (!r || !r.length) continue;
 
-    const boxVal = n(r[2]);    // Dimensione BOX
-    const sleeveVal = n(r[5]); // Dimensione SLEEVE
+    const name = text(r[nameCol]);
+    if (!name || name === "#N/D") continue;
+
+    const boxVal = n(r[boxCol]);       // Dimensione BOX
+    const sleeveVal = n(r[sleeveCol]); // Dimensione SLEEVE
 
     out.push({
       name,
