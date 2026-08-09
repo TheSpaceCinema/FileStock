@@ -94,44 +94,38 @@ function parseMag(m) {
 }
 
 function parseSize(m) {
+  // 1. Trova la riga di intestazione (quella nera con "PRODOTTO")
   let h = -1;
-  // Trova la riga d'intestazione "PRODOTTO"
   for (let i = 0; i < m.length; i++) {
     if (m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
   }
   if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
 
-  // Trova la riga con le sotto-intestazioni (Nome, Size, ecc.)
-  let subH = h + 1;
-  let nameCol = -1, boxCol = -1, sleeveCol = -1;
+  const head = m[h];
+  
+  // Trova dinamicamente gli indici delle colonne
+  let pCol = findCol(head, "PRODOTTO");
+  let boxCol = findCol(head, "BOX");
+  let sleeveCol = findCol(head, "SLEEVE");
 
-  // Cerchiamo le colonne basandoci sulle etichette se presenti
-  for (let col = 0; col < m[subH].length; col++) {
-    const label = norm(m[subH][col]);
-    if (label === "NOME" || label === "PRODOTTO") nameCol = col;
-  }
-
-  // Se non trova l'etichetta "NOME", usa la prima colonna (0) di default
-  if (nameCol < 0) nameCol = 0;
-
-  // Indici fissi basati sulla struttura del file SIZE:
-  // Colonna Nome: 0 (o nameCol)
-  // Colonna BOX Size: 2
-  // Colonna SLEEVE Size: 5
-  boxCol = 2;
-  sleeveCol = 5;
+  // Fallback se le intestazioni hanno spazi extra o maiuscole/minuscole
+  if (pCol < 0) pCol = 1;      // Colonna B
+  if (boxCol < 0) boxCol = 2;  // Colonna C
+  if (sleeveCol < 0) sleeveCol = 3; // Colonna D
 
   const out = [];
-  // Partiamo da due righe sotto l'intestazione "PRODOTTO"
-  for (let i = h + 2; i < m.length; i++) {
+
+  // 2. Legge i dati partendo dalla riga subito sotto l'intestazione
+  for (let i = h + 1; i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
 
-    const name = text(r[nameCol]);
+    const name = text(r[pCol]);
+    // Salta righe vuote o riepiloghi non validi
     if (!name || name === "#N/D") continue;
 
-    const boxVal = n(r[boxCol]);       // Dimensione BOX
-    const sleeveVal = n(r[sleeveCol]); // Dimensione SLEEVE
+    const boxVal = n(r[boxCol]);       // Dimensione BOX (es. 870)
+    const sleeveVal = n(r[sleeveCol]); // Dimensione SLEEVE (es. 6)
 
     out.push({
       name,
@@ -139,9 +133,9 @@ function parseSize(m) {
       sleeveSize: sleeveVal
     });
   }
+
   return out;
 }
-
 function build() {
   if (!mag.length || !size.length) {
     $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> · SIZE: <b>${size.length}</b><br>Carica entrambi i file.`;
