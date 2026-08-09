@@ -1,16 +1,12 @@
 let mag = [], size = [], rows = [];
 
-// Helper per selezionare elementi dal DOM
 const $ = id => document.getElementById(id);
 
-// Inizializzazione degli eventi al caricamento del DOM
 document.addEventListener("DOMContentLoaded", () => {
-
   $("magFile").addEventListener("change", e => {
     const f = e.target.files[0];
     if (!f) return;
     $("magStatus").textContent = "Lettura del report in corso...";
-    
     readMatrix(f).then(m => {
       mag = parseMag(m);
       $("magStatus").textContent = `${f.name} — ${mag.length} prodotti letti`;
@@ -25,7 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const f = e.target.files[0];
     if (!f) return;
     $("sizeStatus").textContent = "Lettura anagrafica in corso...";
-    
     readMatrix(f).then(m => {
       size = parseSize(m);
       $("sizeStatus").textContent = `${f.name} — ${size.length} prodotti letti`;
@@ -45,14 +40,12 @@ function readMatrix(file) {
     r.onload = e => {
       try {
         if (typeof XLSX === "undefined") {
-          throw new Error("Libreria Excel non caricata. Controlla la connessione Internet di GitHub Pages.");
+          throw new Error("Libreria Excel non caricata. Controlla la connessione Internet.");
         }
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
         if (!wb.SheetNames.length) throw new Error("Nessun foglio trovato.");
         resolve(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }));
-      } catch (x) {
-        reject(x);
-      }
+      } catch (x) { reject(x); }
     };
     r.onerror = () => reject(new Error("Impossibile leggere il file."));
     r.readAsArrayBuffer(file);
@@ -73,11 +66,6 @@ function n(v) {
 
 function norm(v) {
   return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase();
-}
-
-function findCol(row, name) {
-  const target = norm(name);
-  return row.findIndex(v => norm(v) === target);
 }
 
 function parseMag(m) {
@@ -106,35 +94,25 @@ function parseMag(m) {
 }
 
 function parseSize(m) {
-  // Cerca la riga di intestazione principale dove compare "PRODOTTO"
   let h = -1;
   for (let i = 0; i < m.length; i++) {
     if (m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
   }
   if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
 
-  // La riga successiva (h + 1) o la riga stessa contiene le sotto-intestazioni (Nome, Size, ecc.)
-  // Basandoci sugli indici di colonna visibili nell'immagine:
-  // Colonna 0: Nome del prodotto
-  // Colonna 2: BOX Size (es. 864, 720, 1000...)
-  // Colonna 5: SLEEVE Size (es. 24, 12, 50...)
-  // Colonna 8: SFUSO / Singolo (se presente o 1 di default)
-  
   const out = [];
   for (let i = h + 2; i < m.length; i++) {
     const r = m[i];
-    const name = text(r[0]); // Colonna 'Nome'
+    const name = text(r[0]);
     if (!name) continue;
 
-    const boxVal = text(r[2]);    // 'Size' sotto BOX
-    const sleeveVal = text(r[5]); // 'Size' sotto SLEEVE
-    const singVal = text(r[8]);   // 'Tot' o Size per Sfuso
+    const boxVal = n(r[2]);    // Dimensione BOX
+    const sleeveVal = n(r[5]); // Dimensione SLEEVE
 
     out.push({
       name,
-      box: boxVal && boxVal !== "#N/D" ? boxVal : "",
-      sleeve: sleeveVal && sleeveVal !== "#N/D" ? sleeveVal : "",
-      sing: singVal && singVal !== "#N/D" ? singVal : ""
+      boxSize: boxVal,
+      sleeveSize: sleeveVal
     });
   }
   return out;
@@ -148,9 +126,16 @@ function build() {
   const sm = new Map(size.map(x => [norm(x.name), x]));
   rows = mag.map(x => {
     const s = sm.get(norm(x.name)) || {};
-    return { ...x, box: s.box ?? "", sleeve: s.sleeve ?? "", sing: s.sing ?? "", matched: !!s.name };
+    return { 
+      ...x, 
+      boxSize: s.boxSize || 0, 
+      sleeveSize: s.sleeveSize || 0,
+      inputBox: 0,
+      inputSleeve: 0,
+      inputSfuso: 0
+    };
   });
-  const matched = rows.filter(x => x.matched).length;
+  const matched = rows.filter(x => x.boxSize || x.sleeveSize).length;
   $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> prodotti · SIZE: <b>${size.length}</b> prodotti · Corrispondenze: <b>${matched}/${rows.length}</b>`;
   render();
 }
@@ -163,17 +148,59 @@ function render() {
   
   data.forEach(r => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${esc(r.code)}</td><td>${esc(r.name)}</td><td>${esc(r.uom)}</td>
-    <td class="num">${fmt(r.iniziale)}</td><td class="num">${fmt(r.danni)}</td><td class="num">${fmt(r.venduto)}</td>
-    <td class="num">${esc(r.box)}</td><td class="num">${esc(r.sleeve)}</td><td class="num">${esc(r.sing)}</td>
-    <td class="num">${fmt(r.atteso)}</td><td class="num"><input class="qty" type="number" step="any" value="${r.atteso}"></td><td class="num diff ok">0</td>`;
     
-    const inp = tr.querySelector("input"), d = tr.querySelector(".diff");
-    inp.addEventListener("input", () => {
-      const v = n(inp.value), x = v - r.atteso;
-      d.textContent = fmt(x);
-      d.className = "num diff " + (x === 0 ? "ok" : "bad");
-    });
+    // Calcolo iniziale effettivo
+    const effettivo = (r.inputBox * r.boxSize) + (r.inputSleeve * r.sleeveSize) + r.inputSfuso;
+    const diff = effettivo - r.atteso;
+
+    tr.innerHTML = `
+      <td>${esc(r.code)}</td>
+      <td>${esc(r.name)}</td>
+      <td>${esc(r.uom)}</td>
+      <td class="num">${fmt(r.iniziale)}</td>
+      <td class="num">${fmt(r.danni)}</td>
+      <td class="num">${fmt(r.venduto)}</td>
+      
+      <!-- BOX -->
+      <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
+      <td class="num grp-box"><input class="qty-input in-box" type="number" step="any" min="0" value="${r.inputBox || ''}"></td>
+      
+      <!-- SLEEVE -->
+      <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
+      <td class="num grp-sleeve"><input class="qty-input in-sleeve" type="number" step="any" min="0" value="${r.inputSleeve || ''}"></td>
+      
+      <!-- SFUSO -->
+      <td class="num grp-sfuso"><input class="qty-input in-sfuso" type="number" step="any" min="0" value="${r.inputSfuso || ''}"></td>
+      
+      <!-- TOTALE E DIFFERENZA -->
+      <td class="num">${fmt(r.atteso)}</td>
+      <td class="num cell-eff">${fmt(effettivo)}</td>
+      <td class="num cell-diff ${diff === 0 ? 'ok' : 'bad'}">${fmt(diff)}</td>
+    `;
+    
+    const inBox = tr.querySelector(".in-box");
+    const inSleeve = tr.querySelector(".in-sleeve");
+    const inSfuso = tr.querySelector(".in-sfuso");
+    const cellEff = tr.querySelector(".cell-eff");
+    const cellDiff = tr.querySelector(".cell-diff");
+
+    function updateCalculations() {
+      r.inputBox = n(inBox.value);
+      r.inputSleeve = n(inSleeve.value);
+      r.inputSfuso = n(inSfuso.value);
+
+      const tot = (r.inputBox * r.boxSize) + (r.inputSleeve * r.sleeveSize) + r.inputSfuso;
+      const d = tot - r.atteso;
+
+      cellEff.textContent = fmt(tot);
+      cellDiff.textContent = fmt(d);
+      cellDiff.className = "num cell-diff " + (d === 0 ? "ok" : "bad");
+    }
+
+    inBox.addEventListener("input", updateCalculations);
+    inSleeve.addEventListener("input", updateCalculations);
+    inSfuso.addEventListener("input", updateCalculations);
+
     $("body").appendChild(tr);
   });
 }
