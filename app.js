@@ -257,75 +257,92 @@ function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "
 
 function parseMag(m) {
   let headerRow = -1;
-  let codeCol = -1, nameCol = -1, uomCol = -1, costCol = -1;
+  let codeCol = 0; // Colonna A (Codice e Nome)
+  let uomCol = -1, openCol = -1, wasteCol = -1, salesCol = -1, closeCol = -1, costCol = -1;
 
-  // 1. Cerca la riga di intestazione
+  // 1. Individua la riga con le intestazioni principali
   for (let i = 0; i < m.length; i++) {
     if (!m[i]) continue;
     const rowStr = m[i].map(v => norm(v)).join(" ");
-    if (rowStr.includes("OPENING BALANCE") || rowStr.includes("INIZIALE") || rowStr.includes("CODICE") || rowStr.includes("DESCRIZIONE")) {
+    if (rowStr.includes("OPENING BALANCE") || rowStr.includes("CLOSING BALANCE")) {
       headerRow = i;
       m[i].forEach((cell, colIdx) => {
         const c = norm(cell);
-        if (c.includes("CODICE") || c.includes("CODE") || c.includes("ITEM NO")) codeCol = colIdx;
-        else if (c.includes("DESCRIZIONE") || c.includes("PRODOTTO") || c.includes("NAME") || c.includes("DESCRIPTION")) nameCol = colIdx;
-        else if (c === "U.M." || c === "UM" || c.includes("UNIT") || c.includes("MISURA")) uomCol = colIdx;
-        else if (c.includes("COST") || c.includes("COSTO") || c.includes("PREZZO")) costCol = colIdx;
+        if (c === "UOM") uomCol = colIdx;
+        else if (c.includes("OPENING")) openCol = colIdx;
+        else if (c.includes("WASTAGE") || c.includes("DANNI")) wasteCol = colIdx;
+        else if (c.includes("SALES") || c.includes("VENDUTO")) salesCol = colIdx;
+        else if (c.includes("CLOSING BALANCE") || c.includes("ATTESO")) closeCol = colIdx;
+        else if (c.includes("STD COST") || c.includes("COSTO")) costCol = colIdx;
       });
       break;
     }
   }
 
-  if (codeCol === -1) codeCol = 1;
-  if (nameCol === -1) nameCol = 2;
-  if (uomCol === -1) uomCol = 3;
+  // Fallback indici se l'intestazione non viene mappata interamente
+  if (uomCol === -1) uomCol = 8;    // Colonna I
+  if (openCol === -1) openCol = 11; // Colonna L
+  if (wasteCol === -1) wasteCol = 16;// Colonna Q
+  if (salesCol === -1) salesCol = 18;// Colonna S
+  if (closeCol === -1) closeCol = 22;// Colonna W
+  if (costCol === -1) costCol = 32; // Colonna AG (Std Cost)
 
-  const startRow = headerRow >= 0 ? headerRow + 1 : 1;
+  const startRow = headerRow >= 0 ? headerRow + 1 : 12;
   const out = [];
 
   for (let i = startRow; i < m.length; i++) {
     const r = m[i];
-    if (!r || r.length < 3) continue;
+    if (!r || !r.length) continue;
 
-    const rawCode = text(r[codeCol]);
-    const code = cleanCode(rawCode);
-    let name = text(r[nameCol]);
-    let uom = text(r[uomCol]) || "PZ";
-
-    // Se name è solo U.M. (es. "pz"), cerca la descrizione in altre celle della riga
-    if (!name || norm(name) === "PZ" || norm(name) === "KG" || norm(name) === "NR" || name.length <= 2) {
-      for (let cIdx = 0; cIdx < r.length; cIdx++) {
-        const val = text(r[cIdx]);
-        if (val && val.length > 2 && norm(val) !== "PZ" && norm(val) !== norm(rawCode) && !norm(val).includes("TOTAL")) {
-          name = val;
-          break;
-        }
+    const cellA = text(r[codeCol]);
+    
+    // Verifica se è una riga contenente un Codice Prodotto (es. "10", "1017", "102")
+    if (cellA && /^\d+$/.test(cellA)) {
+      const rawCode = cellA;
+      const code = cleanCode(rawCode);
+      
+      // Il NOME del prodotto si trova nella riga SUBITO SOTTO nella stessa colonna A!
+      let name = "";
+      if (i + 1 < m.length && m[i + 1]) {
+        name = text(m[i + 1][codeCol]);
       }
+
+      // Se non trova il nome sotto, usa il codice come fallback temporaneo
+      if (!name) name = "Prodotto " + code;
+
+      const uom = text(r[uomCol]) || "PZ";
+      const iniziale = n(r[openCol]);
+      const danni = n(r[wasteCol]);
+      const venduto = n(r[salesCol]);
+      
+      // Closing Balance è la quantità attesa
+      let atteso = n(r[closeCol]);
+      if (atteso === 0 && (iniziale > 0 || venduto > 0)) {
+        atteso = iniziale - danni - venduto;
+      }
+
+      const standardCost = Math.abs(n(r[costCol])); // Prende il costo unitario positivo
+
+      out.push({
+        rawCode,
+        code,
+        name,
+        uom: uom.toUpperCase(),
+        iniziale,
+        danni,
+        venduto,
+        atteso,
+        standardCost
+      });
     }
-
-    if (!code || !name) continue;
-    if (norm(code) === norm(name)) continue;
-    if (norm(code).includes("CODICE") || norm(code).includes("TOTAL") || norm(code).includes("STORE ROOM")) continue;
-
-    const iniziale = n(r[5]), ricevuti = n(r[8]), trasferimenti = n(r[10]), rettifiche = n(r[12]);
-    const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
-
-    const standardCost = costCol >= 0 ? n(r[costCol]) : (r[22] !== undefined ? n(r[22]) : 0);
-
-    let atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
-    if (isNaN(atteso) || (iniziale === 0 && venduto === 0 && atteso === 0)) {
-      atteso = n(r[4]) || 0;
-    }
-
-    out.push({ rawCode, code, name, uom: uom.toUpperCase(), iniziale, danni, venduto, atteso, standardCost });
   }
 
   if (out.length === 0) {
-    throw new Error("Impossibile leggere i prodotti. Verifica la struttura del report Magazzino.");
+    throw new Error("Impossibile leggere i prodotti dal file. Verifica che sia il report Stock Variance corretto.");
   }
+
   return out;
 }
-
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
