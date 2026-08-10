@@ -312,7 +312,7 @@ function parseMag(m) {
   return out;
 }
 
-/* PARSER SIZE & KIT ULTRA-ROBUSTO (SCANSIONE DINAMICA DI TUTTA LA RIGA) */
+/* PARSER SIZE & KIT */
 function parseSize(m) {
   const out = [];
   let isKitSection = false;
@@ -341,7 +341,6 @@ function parseSize(m) {
         const val = r[c];
         if (val === null || val === undefined || String(val).trim() === "") continue;
         
-        // Verifica se il valore è numerico (quantità)
         const numericVal = Number(val);
         if (!isNaN(numericVal) && typeof val !== "string" && !isNaN(parseFloat(val))) {
           if (currentIngName && numericVal > 0) {
@@ -399,43 +398,6 @@ function parseSize(m) {
     throw new Error("Nessuna anagrafica SIZE trovata nel file inserito.");
   }
   return out;
-}
-
-/* CONTRIBUTO KIT SUPER ROBUSTO (PULIZIA TOTALE SPAZI E FORMATTI) */
-function getKitContributionDetail(productName, productCode) {
-  let kitContribution = 0;
-  
-  // Normalizzazione aggressiva: rimuove tutti gli spazi, i simboli e porta tutto in maiuscolo
-  const cleanStr = (str) => norm(str).replace(/[^A-Z0-9]/g, "");
-  
-  const normProdName = cleanStr(productName);
-  const normProdCode = cleanCode(productCode);
-
-  rows.forEach(rowItem => {
-    if (rowItem.isKit && rowItem.ingredients && rowItem.ingredients.length > 0) {
-      rowItem.ingredients.forEach(ing => {
-        const normIngName = cleanStr(ing.name);
-        const normIngCode = cleanCode(ing.code);
-        
-        const matchCode = (normProdCode && normIngCode && normProdCode === normIngCode);
-        const matchName = (normProdName.includes(normIngName) || normIngName.includes(normProdName));
-
-        if (matchCode || matchName) {
-          warehouses.forEach((_, wIdx) => {
-            const kitCounts = getCount(wIdx, rowItem.code);
-            const kitBoxTot = sumArr(kitCounts.box);
-            const kitSleeveTot = sumArr(kitCounts.sleeve);
-            const kitSfusoTot = sumArr(kitCounts.sfuso);
-            const kitTotalPezzi = (kitBoxTot * rowItem.boxSize) + (kitSleeveTot * rowItem.sleeveSize) + kitSfusoTot;
-            
-            kitContribution += kitTotalPezzi * ing.qty;
-          });
-        }
-      });
-    }
-  });
-
-  return kitContribution;
 }
 
 /* BUILD E ORDINAMENTO KIT IN FONDO */
@@ -521,11 +483,9 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
-/* CONTRIBUTO KIT SUPER ROBUSTO (PULIZIA TOTALE SPAZI E FORMATTI) */
 function getKitContributionDetail(productName, productCode) {
   let kitContribution = 0;
   
-  // Normalizzazione aggressiva: rimuove tutti gli spazi, i simboli e porta tutto in maiuscolo
   const cleanStr = (str) => norm(str).replace(/[^A-Z0-9]/g, "");
   
   const normProdName = cleanStr(productName);
@@ -537,7 +497,6 @@ function getKitContributionDetail(productName, productCode) {
         const normIngName = cleanStr(ing.name);
         const normIngCode = cleanCode(ing.code);
         
-        // Cerca corrispondenza esatta dei codici oppure inclusione dei nomi ripuliti da spazi e simboli
         const matchCode = (normProdCode && normIngCode && normProdCode === normIngCode);
         const matchName = (normProdName.includes(normIngName) || normIngName.includes(normProdName));
 
@@ -558,6 +517,7 @@ function getKitContributionDetail(productName, productCode) {
 
   return kitContribution;
 }
+
 function getGlobalRilevato(code, r) {
   let totBox = 0, totSleeve = 0, totSfuso = 0;
   warehouses.forEach((_, idx) => {
@@ -582,23 +542,33 @@ function render() {
   const isTotTab = (currentTab === 'tot');
 
   $("thead").innerHTML = `
-    <tr>
-      <th colspan="2">PRODOTTO</th>
-      <th colspan="3">REPORT MAGAZZINO</th>
-      <th colspan="2" class="grp-box">BOX</th>
-      <th colspan="2" class="grp-sleeve">SLEEVE</th>
-      <th class="grp-sfuso">SFUSO</th>
-      <th colspan="5">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
-      <th colspan="2" class="grp-valore">VALORIZZAZIONE</th>
+    <tr style="position: sticky; top: 0; z-index: 20; background: #212529;">
+      <th colspan="2" style="background: #212529; color: white;">PRODOTTO</th>
+      <th colspan="3" style="background: #343a40; color: white;">REPORT MAGAZZINO</th>
+      <th colspan="2" class="grp-box" style="background: #e3f2fd; color: #0d47a1;">BOX</th>
+      <th colspan="2" class="grp-sleeve" style="background: #f3e5f5; color: #4a148c;">SLEEVE</th>
+      <th class="grp-sfuso" style="background: #fff9c4; color: #f57f17;">SFUSO</th>
+      <th colspan="5" style="background: #212529; color: white;">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
+      <th colspan="2" class="grp-valore" style="background: #ffebee; color: #b71c1c;">VALORIZZAZIONE</th>
     </tr>
-    <tr>
-      <th>Prodotto</th><th>U.M.</th>
-      <th class="num">Iniziale</th><th class="num">Danni</th><th class="num">Venduto</th>
-      <th class="num grp-box">Size</th><th class="grp-box">Q.tà Box</th>
-      <th class="num grp-sleeve">Size</th><th class="grp-sleeve">Q.tà Sleeve</th>
-      <th class="grp-sfuso">Q.tà Sfuso</th>
-      <th class="num">Atteso</th><th class="num">Rilevato Base</th><th class="num" style="background:#e3f2fd; color:#0d47a1;">➕ Da Kit</th><th class="num">Effettivo Totale</th><th class="num">Diff. Totale</th>
-      <th class="num grp-valore">Costo Unit.</th><th class="num grp-valore">Diff. Valore</th>
+    <tr style="position: sticky; top: 41px; z-index: 20; background: #343a40; color: white;">
+      <th style="background: #343a40; color: white;">Prodotto</th>
+      <th style="background: #343a40; color: white;">U.M.</th>
+      <th class="num" style="background: #343a40; color: white;">Iniziale</th>
+      <th class="num" style="background: #343a40; color: white;">Danni</th>
+      <th class="num" style="background: #343a40; color: white;">Venduto</th>
+      <th class="num grp-box" style="background: #bbdefb; color: #0d47a1;">Size</th>
+      <th class="grp-box" style="background: #bbdefb; color: #0d47a1;">Q.tà Box</th>
+      <th class="num grp-sleeve" style="background: #e1bee7; color: #4a148c;">Size</th>
+      <th class="grp-sleeve" style="background: #e1bee7; color: #4a148c;">Q.tà Sleeve</th>
+      <th class="grp-sfuso" style="background: #fff59d; color: #f57f17;">Q.tà Sfuso</th>
+      <th class="num" style="background: #343a40; color: white;">Atteso</th>
+      <th class="num" style="background: #343a40; color: white;">Rilevato Base</th>
+      <th class="num" style="background: #e3f2fd; color: #0d47a1;">➕ Da Kit</th>
+      <th class="num" style="background: #343a40; color: white;">Effettivo Totale</th>
+      <th class="num" style="background: #343a40; color: white;">Diff. Totale</th>
+      <th class="num grp-valore" style="background: #ffcdd2; color: #b71c1c;">Costo Unit.</th>
+      <th class="num grp-valore" style="background: #ffcdd2; color: #b71c1c;">Diff. Valore</th>
     </tr>
   `;
 
@@ -642,12 +612,12 @@ function render() {
       <td class="num">${fmt(r.venduto)}</td>
       
       <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
-      <td class="grp-box">${isTotTab ? fmt(totBoxLocal) : renderMultiInput(currentTab, r.code, 'box')}</td>
+      <td class="grp-box">${isTotTab ? fmt(totBoxLocal) : renderMultiInput(currentTab, r.code, 'box', r.boxSize)}</td>
       
       <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
-      <td class="grp-sleeve">${isTotTab ? fmt(totSleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve')}</td>
+      <td class="grp-sleeve">${isTotTab ? fmt(totSleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve', r.sleeveSize)}</td>
       
-      <td class="num grp-sfuso">${isTotTab ? fmt(totSfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
+      <td class="num grp-sfuso">${isTotTab ? fmt(totSfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso', 1)}</td>
       
       <td class="num">${fmt(r.atteso)}</td>
       <td class="num">${fmt(baseRilevato)}</td>
@@ -664,25 +634,16 @@ function render() {
   recalcKPIs();
 }
 
-function renderMultiInput(whIdx, code, type) {
+function renderMultiInput(whIdx, code, type, sizeVal) {
   const c = getCount(whIdx, code);
   const arr = c[type];
   
-  // Trova il prodotto per verificare i parametri di confezionamento dalla SIZE
-  const r = rows.find(x => x.code === code);
-  
-  // Verifica se il prodotto prevede box o sleeve secondo il file SIZE
   let isDisabled = false;
-  if (r) {
-    if (type === 'box') {
-      isDisabled = !(r.boxSize && r.boxSize > 0);
-    } else if (type === 'sleeve') {
-      isDisabled = !(r.sleeveSize && r.sleeveSize > 0);
-    }
+  if (type === 'box' || type === 'sleeve') {
+    isDisabled = !(sizeVal && sizeVal > 0);
   }
 
-  // Se non previsto, applichiamo gli attributi di disabilitazione e stile grigio
-  const disabledAttr = isDisabled ? 'disabled style="background-color: #e9ecef; color: #adb5bd; cursor: not-allowed;"' : '';
+  const disabledAttr = isDisabled ? 'disabled style="background-color: #e9ecef !important; color: #adb5bd !important; cursor: not-allowed;"' : '';
 
   let html = `<div class="input-scroll-cell" id="container-${code}-${type}">`;
 
@@ -692,7 +653,6 @@ function renderMultiInput(whIdx, code, type) {
              onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
   });
 
-  // Se il campo è disabilitato, non mostriamo l'input aggiuntivo con il placeholder "+"
   if (!isDisabled && arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
     html += `<input class="qty-input" type="number" step="any" min="0" value="" placeholder="+" 
              onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)"
