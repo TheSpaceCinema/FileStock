@@ -257,36 +257,18 @@ function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "
 
 function parseMag(m) {
   let headerRow = -1;
-  let codeCol = 0; // Colonna A (Codice e Nome)
-  let uomCol = -1, openCol = -1, wasteCol = -1, salesCol = -1, closeCol = -1, costCol = -1;
-
-  // 1. Individua la riga con le intestazioni principali
+  
+  // 1. Cerca la riga di intestazione del report Stock Variance
   for (let i = 0; i < m.length; i++) {
     if (!m[i]) continue;
     const rowStr = m[i].map(v => norm(v)).join(" ");
     if (rowStr.includes("OPENING BALANCE") || rowStr.includes("CLOSING BALANCE")) {
       headerRow = i;
-      m[i].forEach((cell, colIdx) => {
-        const c = norm(cell);
-        if (c === "UOM") uomCol = colIdx;
-        else if (c.includes("OPENING")) openCol = colIdx;
-        else if (c.includes("WASTAGE") || c.includes("DANNI")) wasteCol = colIdx;
-        else if (c.includes("SALES") || c.includes("VENDUTO")) salesCol = colIdx;
-        else if (c.includes("CLOSING BALANCE") || c.includes("ATTESO")) closeCol = colIdx;
-        else if (c.includes("STD COST") || c.includes("COSTO")) costCol = colIdx;
-      });
       break;
     }
   }
 
-  // Fallback indici se l'intestazione non viene mappata interamente
-  if (uomCol === -1) uomCol = 8;    // Colonna I
-  if (openCol === -1) openCol = 11; // Colonna L
-  if (wasteCol === -1) wasteCol = 16;// Colonna Q
-  if (salesCol === -1) salesCol = 18;// Colonna S
-  if (closeCol === -1) closeCol = 22;// Colonna W
-  if (costCol === -1) costCol = 32; // Colonna AG (Std Cost)
-
+  // Se trova l'intestazione parte da lì, altrimenti dalla riga 12 (standard di questi report)
   const startRow = headerRow >= 0 ? headerRow + 1 : 12;
   const out = [];
 
@@ -294,34 +276,41 @@ function parseMag(m) {
     const r = m[i];
     if (!r || !r.length) continue;
 
-    const cellA = text(r[codeCol]);
-    
-    // Verifica se è una riga contenente un Codice Prodotto (es. "10", "1017", "102")
+    // In colonna A (indice 0) c'è il Codice Prodotto
+    const cellA = text(r[0]);
+
+    // Ignora righe vuote, intestazioni di sezione (es. FOOD) o descrizioni
     if (cellA && /^\d+$/.test(cellA)) {
       const rawCode = cellA;
       const code = cleanCode(rawCode);
-      
-      // Il NOME del prodotto si trova nella riga SUBITO SOTTO nella stessa colonna A!
+
+      // Il nome del prodotto sta nella riga SUCCESSIVA (i + 1) sempre in colonna A!
       let name = "";
       if (i + 1 < m.length && m[i + 1]) {
-        name = text(m[i + 1][codeCol]);
+        name = text(m[i + 1][0]);
       }
 
-      // Se non trova il nome sotto, usa il codice come fallback temporaneo
-      if (!name) name = "Prodotto " + code;
+      // Se non trova il nome sotto o la riga è ambigua
+      if (!name || /^\d+$/.test(name)) {
+        name = "Prodotto " + code;
+      }
 
-      const uom = text(r[uomCol]) || "PZ";
-      const iniziale = n(r[openCol]);
-      const danni = n(r[wasteCol]);
-      const venduto = n(r[salesCol]);
+      // Mappatura esatta sulle colonne del report The Space Cinema:
+      // Colonna C (2) o I (8) -> UOM
+      // Colonna L (11) -> Opening Balance (Iniziale)
+      // Colonna Q (16) -> Less Wastage (Danni)
+      // Colonna S (18) -> Less Sales (Venduto)
+      // Colonna W (22) -> Closing Balance (Atteso)
+      // Colonna AG (32) -> Std Cost (Costo Unitario)
+
+      const uom = text(r[2] || r[8] || "PZ");
+      const iniziale = n(r[11]);
+      const danni = n(r[16]);
+      const venduto = n(r[18]);
+      const atteso = n(r[22]);
       
-      // Closing Balance è la quantità attesa
-      let atteso = n(r[closeCol]);
-      if (atteso === 0 && (iniziale > 0 || venduto > 0)) {
-        atteso = iniziale - danni - venduto;
-      }
-
-      const standardCost = Math.abs(n(r[costCol])); // Prende il costo unitario positivo
+      // Costo unitario positivo (colonna AG / indice 32)
+      let standardCost = Math.abs(n(r[32]));
 
       out.push({
         rawCode,
@@ -338,7 +327,7 @@ function parseMag(m) {
   }
 
   if (out.length === 0) {
-    throw new Error("Impossibile leggere i prodotti dal file. Verifica che sia il report Stock Variance corretto.");
+    throw new Error("Nessun prodotto trovato. Assicurati che sia il file Stock Variance Report.");
   }
 
   return out;
