@@ -255,7 +255,7 @@ function n(v) {
 }
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
-/* PARSER MAGAZZINO ROBUSTO */
+/* PARSER MAGAZZINO */
 function parseMag(m) {
   const out = [];
 
@@ -312,43 +312,19 @@ function parseMag(m) {
   return out;
 }
 
-/* PARSER SIZE & KIT GESTIONALE */
+/* PARSER SIZE & KIT CORRETTO */
 function parseSize(m) {
-  let h = -1;
-  for (let i = 0; i < m.length; i++) {
-    if (!m[i]) continue;
-    const rowStr = m[i].map(v => norm(v)).join(" ");
-    if (rowStr.includes("PRODOTTO") || rowStr.includes("DESCRIZIONE") || rowStr.includes("ARTICOLO") || rowStr.includes("BOX") || rowStr.includes("SIZE")) {
-      h = i;
-      break;
-    }
-  }
-
-  let codeCol = -1, pCol = -1, boxCol = -1, sleeveCol = -1;
-  if (h >= 0) {
-    const head = m[h];
-    codeCol = head.findIndex(v => { const nV = norm(v); return nV === "CODICE" || nV === "CODE" || nV.includes("ITEM") || nV.includes("ARTICOLO"); });
-    pCol = head.findIndex(v => { const nV = norm(v); return nV.includes("PRODOTTO") || nV.includes("DESCRIZIONE") || nV.includes("NOME") || nV.includes("NAME"); });
-    boxCol = head.findIndex(v => { const nV = norm(v); return nV.includes("BOX") || nV.includes("CARTONE") || nV.includes("CT") || nV.includes("COLLO"); });
-    sleeveCol = head.findIndex(v => { const nV = norm(v); return nV.includes("SLEEVE") || nV.includes("PACCO") || nV.includes("STECCA") || nV.includes("BLISTER"); });
-  }
-
-  if (codeCol < 0) codeCol = 0;
-  if (pCol < 0) pCol = 1;
-  if (boxCol < 0) boxCol = 2;
-  if (sleeveCol < 0) sleeveCol = 3;
-
   const out = [];
   let isKitSection = false;
 
-  for (let i = (h >= 0 ? h + 1 : 0); i < m.length; i++) {
+  for (let i = 0; i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
 
     const firstVal = text(r[0]);
     const normFirst = norm(firstVal);
 
-    if (normFirst === "KIT" || norm(r[1]) === "TIPO") {
+    if (normFirst === "KIT" || norm(r[1]) === "TIPO" || (normFirst === "" && norm(r[1]) === "TIPO")) {
       isKitSection = true;
       continue;
     }
@@ -356,15 +332,12 @@ function parseSize(m) {
     if (isKitSection) {
       const kitName = firstVal;
       const kitType = text(r[1]); 
-      if (!kitName) continue;
+      if (!kitName || normFirst === "PRODOTTO" || normFirst === "KIT") continue;
 
       const ingredients = [];
       for (let c = 2; c < r.length - 1; c += 2) {
         const compName = text(r[c]);
-        let compQty = n(r[c + 1]);
-        if (compQty === 0 && c + 2 < r.length) {
-          compQty = n(r[c + 2]);
-        }
+        const compQty = n(r[c + 1]);
         if (compName && compQty > 0) {
           ingredients.push({ name: compName, qty: compQty });
         }
@@ -380,18 +353,29 @@ function parseSize(m) {
         ingredients
       });
     } else {
-      const rawCode = text(r[codeCol]);
-      const code = cleanCode(rawCode);
-      const name = text(r[pCol]);
-
+      const name = firstVal;
       const normName = norm(name);
-      if ((!name && !code) || name === "#N/D" || normName.includes("PRODOTTO") || normName.includes("DESCRIZIONE")) continue;
+      if (!name || name === "#N/D" || normName.includes("PRODOTTO") || normName.includes("DESCRIZIONE") || normName.includes("BOX")) continue;
+
+      const boxSize = n(r[1]);
+      const sleeveSize = n(r[2]);
+
+      let primaryCode = "";
+      for (let c = 4; c < r.length; c++) {
+        const valStr = text(r[c]);
+        if (valStr && !primaryCode) {
+          primaryCode = cleanCode(valStr);
+          break;
+        }
+      }
+      if (!primaryCode) primaryCode = cleanCode(name);
 
       out.push({
-        code,
+        code: primaryCode,
+        rawCode: primaryCode,
         name,
-        boxSize: n(r[boxCol]),
-        sleeveSize: n(r[sleeveCol]),
+        boxSize,
+        sleeveSize,
         isKit: false,
         ingredients: []
       });
@@ -404,7 +388,7 @@ function parseSize(m) {
   return out;
 }
 
-/* BUILD E ORDINAMENTO KIT IN FONDO CON COLORE DIVERSO */
+/* BUILD E ORDINAMENTO KIT IN FONDO */
 function build() {
   if (!mag.length || !size.length) {
     $("mainStatus").style.display = "block";
@@ -427,7 +411,7 @@ function build() {
       ...x, 
       boxSize: s.boxSize || 0, 
       sleeveSize: s.sleeveSize || 0,
-      isKit: s.isKit || norm(x.name).includes("KIT"),
+      isKit: !!s.isKit,
       ingredients: s.ingredients || []
     };
   });
@@ -487,6 +471,7 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
+/* CALCOLO GLOBALE CON SCOMPOSIZIONE KIT SUI COMPONENTI */
 function getGlobalRilevato(code, r) {
   let totBox = 0, totSleeve = 0, totSfuso = 0;
   warehouses.forEach((_, idx) => {
@@ -495,7 +480,29 @@ function getGlobalRilevato(code, r) {
     totSleeve += sumArr(c.sleeve);
     totSfuso += sumArr(c.sfuso);
   });
-  return (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+  
+  let basePezzi = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+
+  let kitContribution = 0;
+  rows.forEach(rowItem => {
+    if (rowItem.isKit && rowItem.ingredients && rowItem.ingredients.length > 0) {
+      rowItem.ingredients.forEach(ing => {
+        if (norm(ing.name) === norm(r.name)) {
+          warehouses.forEach((_, wIdx) => {
+            const kitCounts = getCount(wIdx, rowItem.code);
+            const kitBoxTot = sumArr(kitCounts.box);
+            const kitSleeveTot = sumArr(kitCounts.sleeve);
+            const kitSfusoTot = sumArr(kitCounts.sfuso);
+            const kitTotalPezzi = (kitBoxTot * rowItem.boxSize) + (kitSleeveTot * rowItem.sleeveSize) + kitSfusoTot;
+            
+            kitContribution += kitTotalPezzi * ing.qty;
+          });
+        }
+      });
+    }
+  });
+
+  return basePezzi + kitContribution;
 }
 
 /* ---------------- TABLE RENDER ---------------- */
@@ -534,7 +541,6 @@ function render() {
   data.forEach(r => {
     const tr = document.createElement("tr");
     
-    // Stile differenziato per i Kit (sfondo evidenziato in azzurro/blu chiaro)
     if (r.isKit) {
       tr.style.backgroundColor = "#e3f2fd";
       tr.style.borderLeft = "4px solid #1976d2";
