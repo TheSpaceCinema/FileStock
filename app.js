@@ -112,7 +112,6 @@ function getGlobalRilevato(code, r) {
 
 /* ---------------- UI & RENDERING TAB ---------------- */
 let currentActiveWhIdx = 0;
-
 function initTabs() {
   const tabsContainer = document.getElementById("warehousesTabs");
   if (!tabsContainer) return;
