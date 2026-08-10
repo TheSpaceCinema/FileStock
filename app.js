@@ -259,7 +259,7 @@ function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "
 function parseMag(m) {
   let headerRow = -1;
   
-  // 1. Cerca la riga di intestazione del report
+  // 1. Trova l'intestazione
   for (let i = 0; i < m.length; i++) {
     if (!m[i]) continue;
     const rowStr = m[i].map(v => norm(v)).join(" ");
@@ -269,7 +269,7 @@ function parseMag(m) {
     }
   }
 
-  const startRow = headerRow >= 0 ? headerRow + 1 : 10;
+  const startRow = headerRow >= 0 ? headerRow + 1 : 0;
   const out = [];
 
   for (let i = startRow; i < m.length; i++) {
@@ -279,24 +279,25 @@ function parseMag(m) {
     const cellA = text(r[0]);
     const normA = norm(cellA);
 
-    // Salta intestazioni, righe vuote o righe di totale
+    // Salta righe vuote, intestazioni, totali e descrizioni di categoria
     if (!cellA || 
         normA.includes("STOCK LOCATION") || 
         normA.includes("STOCKTAKE") || 
         normA.includes("HISTORICAL") || 
         normA.includes("PLEASE TAKE") || 
         normA.includes("OPENING BALANCE") || 
+        normA.includes("CLOSING BALANCE") || 
         normA.includes("TOTAL") || 
         normA.includes("CONCESSIONS STORE") ||
+        normA.includes("PAGE ") ||
         normA === "FOOD" || normA === "BEVERAGE" || normA === "PACKAGING") {
       continue;
     }
 
-    // Codice trovato in colonna A
     const rawCode = cellA;
     const code = cleanCode(rawCode);
 
-    // Il NOME del prodotto risiede nella riga IMMEDIATAMENTE SOTTO (i+1) in Colonna A
+    // Nome prodotto: di norma sulla riga i+1 in colonna A
     let name = "";
     if (i + 1 < m.length && m[i + 1]) {
       const nextCellA = text(m[i + 1][0]);
@@ -305,24 +306,20 @@ function parseMag(m) {
       }
     }
 
-    // Fallback in caso di layout alternativi
     if (!name) {
       name = text(r[1]) || text(r[2]) || ("Prodotto " + code);
     }
 
-    // Mappatura esatta delle colonne di report Stock Variance
     const uom = text(r[2] || r[8] || "PZ");
     const iniziale = n(r[11]);
     const danni = n(r[16]);
     const venduto = n(r[18]);
     
-    // Atteso (Closing Balance)
     let atteso = n(r[22]);
     if (atteso === 0 && (iniziale > 0 || venduto > 0)) {
       atteso = iniziale - danni - venduto;
     }
 
-    // Costo Standard Unitario (colonna AG / index 32)
     const standardCost = Math.abs(n(r[32] || r[30] || 0));
 
     out.push({
