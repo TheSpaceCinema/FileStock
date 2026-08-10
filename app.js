@@ -247,36 +247,54 @@ function n(v) {
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
 function parseMag(m) {
-  let startRow = -1;
+  let headerRow = -1;
+  let codeCol = 1, nameCol = 2, uomCol = 3;
   let costCol = -1;
 
+  // 1. Cerca la riga di intestazione per mappare correttamente le colonne
   for (let i = 0; i < m.length; i++) {
-    if (m[i] && m[i].some(v => norm(v).includes("OPENING BALANCE") || norm(v).includes("INIZIALE"))) { 
-      startRow = i + 1; 
-      costCol = m[i].findIndex(v => norm(v).includes("COST") || norm(v).includes("COSTO") || norm(v).includes("PREZZO"));
-      break; 
+    if (!m[i]) continue;
+    const rowStr = m[i].map(v => norm(v)).join(" ");
+    if (rowStr.includes("OPENING BALANCE") || rowStr.includes("INIZIALE") || rowStr.includes("CODICE") || rowStr.includes("DESCRIZIONE")) {
+      headerRow = i;
+      
+      // Mappatura dinamica delle colonne se presenti i nomi
+      m[i].forEach((cell, colIdx) => {
+        const c = norm(cell);
+        if (c.includes("CODICE") || c.includes("CODE") || c.includes("ITEM NO")) codeCol = colIdx;
+        else if (c.includes("DESCRIZIONE") || c.includes("PRODOTTO") || c.includes("NAME") || c.includes("DESCRIPTION")) nameCol = colIdx;
+        else if (c === "U.M." || c === "UM" || c.includes("UNIT") || c.includes("MISURA")) uomCol = colIdx;
+        else if (c.includes("COST") || c.includes("COSTO") || c.includes("PREZZO")) costCol = colIdx;
+      });
+      break;
     }
   }
-  
-  if (startRow < 0) startRow = 1;
 
+  const startRow = headerRow >= 0 ? headerRow + 1 : 1;
   const out = [];
 
   for (let i = startRow; i < m.length; i++) {
     const r = m[i];
     if (!r || r.length < 3) continue;
-    
-    const code = text(r[1]);
-    const name = text(r[2]);
+
+    const code = text(r[codeCol]);
+    let name = text(r[nameCol]);
+    let uom = text(r[uomCol]) || "PZ";
+
+    // Se per qualche motivo 'name' è "PZ" o "pz" e l'altra colonna ha il testo lungo, invertiamo
+    if ((norm(name) === "PZ" || norm(name) === "KG" || norm(name) === "NR" || name.length <= 2) && text(r[uomCol]).length > 2) {
+      const temp = name;
+      name = text(r[uomCol]);
+      uom = temp;
+    }
 
     if (!code || !name) continue;
     if (norm(code) === norm(name)) continue;
     if (norm(code).includes("CODICE") || norm(code).includes("TOTAL") || norm(code).includes("STORE ROOM")) continue;
 
-    const uom = text(r[3]) || "PZ";
     const iniziale = n(r[5]), ricevuti = n(r[8]), trasferimenti = n(r[10]), rettifiche = n(r[12]);
     const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
-    
+
     const standardCost = costCol >= 0 ? n(r[costCol]) : (r[22] !== undefined ? n(r[22]) : 0);
 
     let atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
@@ -284,7 +302,7 @@ function parseMag(m) {
       atteso = n(r[4]) || 0;
     }
 
-    out.push({ code, name, uom, iniziale, danni, venduto, atteso, standardCost });
+    out.push({ code, name, uom: uom.toUpperCase(), iniziale, danni, venduto, atteso, standardCost });
   }
 
   if (out.length === 0) {
