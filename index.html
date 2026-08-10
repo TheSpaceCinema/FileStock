@@ -1,111 +1,92 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gestione Magazzino Multilivello v4</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-*{box-sizing:border-box}
-body{font-family:Arial,sans-serif;margin:0;background:#f3f5f7;color:#17202a}
-main{max-width:1800px;margin:auto;padding:20px}
-h1{margin:0 0 16px;font-size:24px;display:flex;justify-content:space-between;align-items:center}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px #0001}
-h3{margin:0 0 10px;font-size:15px}
-.status{margin-top:8px;color:#555;font-size:13px}
-
-/* TAB NAVIGATION */
-.tabs-bar{display:flex;gap:8px;margin-top:20px;border-bottom:2px solid #ccc;overflow-x:auto;padding-bottom:2px}
-.tab-btn{padding:10px 18px;border:none;background:#e2e8f0;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;font-size:13px;color:#475569;white-space:nowrap}
-.tab-btn.active{background:#2563eb;color:#fff}
-.tab-btn.setup-btn{background:#475569;color:#fff;margin-left:auto}
-
-/* TOOLBAR & TABLE */
-.toolbar{margin-top:16px;display:flex;gap:10px;align-items:center}
-.search{flex:1;padding:10px;border:1px solid #bbb;border-radius:8px;font-size:14px}
-.tablewrap{margin-top:16px;overflow:auto;max-height:65vh}
-.table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
-th,td{padding:6px 8px;border-bottom:1px solid #ddd;white-space:nowrap}
-th{position:sticky;top:0;background:#eef1f4;z-index:2;border-right:1px solid #ccc;font-weight:600}
-.num{text-align:right}
-.grp-box{background:#fff3cd!important}
-.grp-sleeve{background:#d1e7dd!important}
-.grp-sfuso{background:#e2e3e5!important}
-.qty-input{width:65px;padding:4px 6px;border:1px solid #aaa;border-radius:4px;text-align:right;font-size:12px}
-.ok{color:#17823b;font-weight:bold}
-.bad{color:#c62828;font-weight:bold}
-.note{margin-top:12px;font-size:12px;color:#666}
-
-/* SETUP FORM */
-.setup-box{display:flex;flex-direction:column;gap:12px;max-width:500px;margin:20px auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 8px #0002}
-.wh-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-.wh-item{display:flex;gap:8px;align-items:center}
-.wh-item input{flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:6px}
-.btn{padding:8px 14px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-weight:bold}
-.btn-danger{background:#dc2626}
-.btn-sec{background:#64748b}
-
-.toggle-header{font-size:12px;color:#2563eb;cursor:pointer;text-decoration:underline;margin-top:6px;display:inline-block}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Inventario Cinema</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Libreria SheetJS XLSX per lettura ed esportazione Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<main>
-  <h1>
-    <span>Gestione Magazzino Cinema v4</span>
-    <button class="btn btn-sec" onclick="toggleFilesSection()">📁 Caricamento File</button>
-  </h1>
 
-  <!-- SEZIONE CARICAMENTO FILE -->
-  <div id="filesSection" class="grid">
-    <div class="card">
-      <h3>1. File Magazzino (Report Stock)</h3>
-      <input id="magFile" type="file" accept=".xls,.xlsx,.xlsm">
-      <div id="magStatus" class="status">Nessun file caricato</div>
+  <header class="header">
+    <div class="header-content">
+      <h1 id="appTitle">📊 Gestione Inventario Cinema</h1>
+      <button class="btn btn-secondary" onclick="toggleFilesSection()">📁 Caricamento File</button>
     </div>
-    <div class="card">
-      <h3>2. Anagrafica SIZE</h3>
-      <input id="sizeFile" type="file" accept=".xls,.xlsx,.xlsm">
-      <div id="sizeStatus" class="status">Nessun file caricato</div>
-    </div>
-  </div>
+  </header>
 
-  <div id="mainStatus" class="card" style="margin-top:16px">Carica i file e configura i magazzini per iniziare.</div>
+  <main class="container">
+    <!-- SEZIONE CARICAMENTO FILE -->
+    <section id="filesSection" class="card files-card">
+      <div class="file-upload-block">
+        <h3>1. Report Magazzino</h3>
+        <input type="file" id="magFile" accept=".xlsx, .xls">
+        <p id="magStatus" class="status-text">Seleziona il report magazzino</p>
+      </div>
+      <div class="file-upload-block">
+        <h3>2. Anagrafica SIZE</h3>
+        <input type="file" id="sizeFile" accept=".xlsx, .xls">
+        <p id="sizeStatus" class="status-text">Seleziona l'anagrafica SIZE</p>
+      </div>
+    </section>
 
-  <!-- TABS DI NAVIGAZIONE -->
-  <div class="tabs-bar" id="tabsBar"></div>
-
-  <!-- CONTENUTO PRINCIPALE -->
-  <div id="tabContent">
-    <div class="card toolbar">
-      <input id="search" class="search" placeholder="Cerca prodotto per codice o nome...">
-      <span id="count"></span>
+    <!-- STATO PRINCIPALE -->
+    <div id="mainStatus" class="card info-card">
+      Carica entrambi i file per iniziare la gestione dell'inventario.
     </div>
 
-    <div class="card tablewrap">
-      <table class="table">
-        <thead id="thead"></thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
-  </div>
+    <!-- CONTENUTO TABELLA & TABS -->
+    <div id="tabContent" style="display: none;">
+      <!-- BARRA TABS MAGAZZINI -->
+      <div id="tabsBar" class="tabs-bar"></div>
 
-  <!-- SCHEDA SETUP -->
-  <div id="setupView" style="display:none">
-    <div class="setup-box">
-      <h2>⚙️ Configurazione Magazzini Cinema</h2>
-      <p style="font-size:13px;color:#666">Definisci i punti di stoccaggio o vendita del cinema (es. Bar Centrale, Deposito, Popcorn Stand).</p>
-      
-      <div class="wh-list" id="whList"></div>
+      <!-- BARRA DI RICERCA ED ESPORTAZIONE -->
+      <div class="toolbar card">
+        <input type="text" id="search" placeholder="🔍 Cerca codice o nome prodotto..." class="search-input">
+        <span id="count" class="count-badge">0 prodotti</span>
+        <button id="exportBtn" class="btn btn-success" onclick="exportToExcel()">
+          📥 Esporta in Excel
+        </button>
+      </div>
 
-      <div style="display:flex;gap:10px;margin-top:16px">
-        <button class="btn btn-sec" onclick="addWarehouseInput()">+ Aggiungi Magazzino</button>
-        <button class="btn" onclick="saveWarehousesSetup()">Salva e Applica</button>
+      <!-- TABELLA DATI -->
+      <div class="table-container card">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
       </div>
     </div>
-  </div>
 
-</main>
-<script src="app.js" defer></script>
+    <!-- VISTA SETUP MAGAZZINI & CINEMA -->
+    <div id="setupView" class="card" style="display: none;">
+      <h2>⚙️ Configurazione Cinema & Magazzini</h2>
+      <p class="help-text">Seleziona la tua struttura dall'elenco e imposta i magazzini presenti. Le impostazioni verranno salvate su questo computer.</p>
+      
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label for="cinemaSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">Seleziona Sede / Cinema:</label>
+        <select id="cinemaSelect" style="width: 100%; max-width: 400px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem;" onchange="handleCinemaSelectChange()">
+          <!-- Popolato dinamicamente da app.js -->
+        </select>
+
+        <div id="customCinemaDiv" style="display: none; margin-top: 10px;">
+          <label for="customCinemaInput" style="font-size: 0.9em; display: block; margin-bottom: 3px;">Inserisci Nome Nuovo Cinema:</label>
+          <input type="text" id="customCinemaInput" placeholder="Es. TSC Nuova Sede" style="width: 100%; max-width: 400px; padding: 6px 10px;">
+        </div>
+      </div>
+
+      <h3>Elenco Magazzini della Sede:</h3>
+      <div id="whList" class="wh-list"></div>
+
+      <div class="setup-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+        <button class="btn btn-secondary" onclick="addWarehouseInput()">➕ Aggiungi Magazzino</button>
+        <button class="btn btn-primary" onclick="saveWarehousesSetup()">💾 Salva e Applica</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
