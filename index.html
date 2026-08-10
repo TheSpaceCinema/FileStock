@@ -34,8 +34,8 @@
     .tab-btn.setup-btn.active { background: #000; }
 
     /* TOOLBAR */
-    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
-    .search-input { flex: 1; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; }
+    .search-input { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
     .count-badge { font-weight: bold; color: #666; white-space: nowrap; }
 
     /* BUTTONS */
@@ -48,6 +48,8 @@
     .btn-success:hover { background-color: #1b5e20; }
     .btn-danger { background-color: #d32f2f; color: white; }
     .btn-danger:hover { background-color: #b71c1c; }
+    .btn-warning { background-color: #f57c00; color: white; }
+    .btn-warning:hover { background-color: #e65100; }
 
     /* TABELLA */
     .table-container { overflow-x: auto; padding: 0; }
@@ -105,6 +107,9 @@
       <div class="toolbar card">
         <input type="text" id="search" placeholder="🔍 Cerca codice o nome prodotto..." class="search-input">
         <span id="count" class="count-badge">0 prodotti</span>
+        <button id="resetBtn" class="btn btn-warning" onclick="resetCounts()">
+          🗑️ Azzera Conteggi
+        </button>
         <button id="exportBtn" class="btn btn-success" onclick="exportToExcel()">
           📥 Esporta in Excel
         </button>
@@ -167,6 +172,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       loadSetupFromStorage();
+      loadCountsFromStorage();
       updateHeaderTitle();
 
       $("magFile").addEventListener("change", e => {
@@ -215,6 +221,25 @@
       const savedWh = localStorage.getItem("cinema_warehouses");
       if (savedWh) {
         try { warehouses = JSON.parse(savedWh); } catch(e){}
+      }
+    }
+
+    function loadCountsFromStorage() {
+      const savedCounts = localStorage.getItem("cinema_counts_data");
+      if (savedCounts) {
+        try { countsData = JSON.parse(savedCounts); } catch(e){}
+      }
+    }
+
+    function saveCountsToStorage() {
+      localStorage.setItem("cinema_counts_data", JSON.stringify(countsData));
+    }
+
+    function resetCounts() {
+      if (confirm("Sei sicuro di voler azzerare tutti i conteggi inseriti nei magazzini?")) {
+        countsData = {};
+        saveCountsToStorage();
+        render();
       }
     }
 
@@ -392,6 +417,8 @@
         
         const iniziale = n(r[5]), ricevuti = n(r[8]), trasferimenti = n(r[10]), rettifiche = n(r[12]);
         const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
+        
+        // Formula completa per il calcolo delle giacenze attese
         const atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
         
         out.push({ code, name, uom, iniziale, danni, venduto, atteso });
@@ -546,6 +573,8 @@
             c.box = n(inBox.value);
             c.sleeve = n(inSleeve.value);
             c.sfuso = n(inSfuso.value);
+
+            saveCountsToStorage();
 
             const tot = (c.box * r.boxSize) + (c.sleeve * r.sleeveSize) + c.sfuso;
             const d = tot - r.atteso;
