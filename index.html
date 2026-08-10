@@ -25,7 +25,17 @@
     .status-text { margin-top: 10px; font-size: 0.9rem; color: #2e7d32; font-weight: bold; }
     
     .info-card { text-align: center; color: #555; font-size: 1.1rem; padding: 25px; }
-    
+
+  /* Intestazione della tabella fissa durante lo scroll */
+  table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: #111; /* Sfondo scuro per coprire il testo che scorre sotto */
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
     /* SUMMARY KPI CARDS TOP */
     .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .kpi-card { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); border-left: 5px solid #1a237e; }
