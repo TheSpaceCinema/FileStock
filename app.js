@@ -123,7 +123,7 @@ function initTabs() {
     const icon = isCaramelle ? "🍬" : "📦";
     html += `<button class="tab-btn ${idx === currentActiveWhIdx ? 'active' : ''}" onclick="switchTab(${idx})">${icon} ${esc(wh)}</button>`;
   });
-  html += `<button class="tab-btn tab-riepilogo" onclick="switchTab('riepilogo')">📊 RIEPILOGO TOTALE</button>";
+  html += `<button class="tab-btn tab-riepilogo ${currentActiveWhIdx === 'riepilogo' ? 'active' : ''}" onclick="switchTab('riepilogo')">📊 RIEPILOGO TOTALE</button>`;
   
   tabsContainer.innerHTML = html;
 }
