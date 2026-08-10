@@ -246,7 +246,6 @@ function n(v) {
 }
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
-/* PARSING CORRETTO MAGAZZINO (Pulisce categorie e accoppiamenti errati) */
 function parseMag(m) {
   let startRow = -1;
   let costCol = -1;
@@ -270,9 +269,8 @@ function parseMag(m) {
     const code = text(r[1]);
     const name = text(r[2]);
 
-    // Ignora righe vuote, intestazioni, sezioni di categoria (es. FOOD, Concessions Store room) o totali
     if (!code || !name) continue;
-    if (norm(code) === norm(name)) continue; // Filtra le righe di categoria dove codice e nome coincidono
+    if (norm(code) === norm(name)) continue;
     if (norm(code).includes("CODICE") || norm(code).includes("TOTAL") || norm(code).includes("STORE ROOM")) continue;
 
     const uom = text(r[3]) || "PZ";
@@ -356,7 +354,6 @@ function build() {
     };
   });
 
-  // NASCONDE UPLOAD E MOSTRA TABELLA AUTOMATICAMENTE
   $("filesSection").style.display = "none";
   $("mainStatus").style.display = "none";
   $("setupView").style.display = "none";
@@ -368,7 +365,7 @@ function build() {
   render();
 }
 
-/* ---------------- TABLE & DATA RENDER ---------------- */
+/* ---------------- DATA CALCULATIONS ---------------- */
 function getCount(whIdx, code) {
   if (!countsData[whIdx]) countsData[whIdx] = {};
   if (!countsData[whIdx][code]) countsData[whIdx][code] = { box: [0], sleeve: [0], sfuso: [0] };
@@ -383,6 +380,19 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
+// Calcola la quantità rilevata GLOBALE per un prodotto in TUTTI i magazzini
+function getGlobalRilevato(code, r) {
+  let totBox = 0, totSleeve = 0, totSfuso = 0;
+  warehouses.forEach((_, idx) => {
+    const c = getCount(idx, code);
+    totBox += sumArr(c.box);
+    totSleeve += sumArr(c.sleeve);
+    totSfuso += sumArr(c.sfuso);
+  });
+  return (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+}
+
+/* ---------------- TABLE RENDER ---------------- */
 function render() {
   if (currentTab === 'setup') return;
 
@@ -399,7 +409,7 @@ function render() {
       <th colspan="2" class="grp-box">BOX</th>
       <th colspan="2" class="grp-sleeve">SLEEVE</th>
       <th class="grp-sfuso">SFUSO</th>
-      <th colspan="3">${isTotTab ? 'CONFRONTO GLOBALE' : 'TOTALE ' + (warehouses[currentTab] || '').toUpperCase()}</th>
+      <th colspan="3">CONFRONTO GLOBALE</th>
       <th colspan="2" class="grp-valore">VALORIZZAZIONE</th>
     </tr>
     <tr>
@@ -408,45 +418,25 @@ function render() {
       <th class="num grp-box">Size</th><th class="grp-box">Q.tà Box</th>
       <th class="num grp-sleeve">Size</th><th class="grp-sleeve">Q.tà Sleeve</th>
       <th class="grp-sfuso">Q.tà Sfuso</th>
-      <th class="num">Atteso</th><th class="num">Effettivo</th><th class="num">Diff.</th>
+      <th class="num">Atteso</th><th class="num">Effettivo Globale</th><th class="num">Diff. Totale</th>
       <th class="num grp-valore">Costo Unit.</th><th class="num grp-valore">Diff. Valore</th>
     </tr>
   `;
 
   $("tbody").innerHTML = "";
 
-  let totalAttesoPezzi = 0;
-  let totalRilevatoPezzi = 0;
-  let totalDiffPezzi = 0;
-  let totalDiffValore = 0;
-
   data.forEach(r => {
     const tr = document.createElement("tr");
+    tr.id = `row-${r.code}`;
 
-    let totBox = 0, totSleeve = 0, totSfuso = 0;
+    const c = getCount(currentTab, r.code);
+    const boxLocal = sumArr(c.box);
+    const sleeveLocal = sumArr(c.sleeve);
+    const sfusoLocal = sumArr(c.sfuso);
 
-    if (isTotTab) {
-      warehouses.forEach((_, idx) => {
-        const c = getCount(idx, r.code);
-        totBox += sumArr(c.box);
-        totSleeve += sumArr(c.sleeve);
-        totSfuso += sumArr(c.sfuso);
-      });
-    } else {
-      const c = getCount(currentTab, r.code);
-      totBox = sumArr(c.box);
-      totSleeve = sumArr(c.sleeve);
-      totSfuso = sumArr(c.sfuso);
-    }
-
-    const effettivo = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
-    const diff = effettivo - r.atteso;
-    const diffValore = diff * (r.standardCost || 0);
-
-    totalAttesoPezzi += r.atteso;
-    totalRilevatoPezzi += effettivo;
-    totalDiffPezzi += diff;
-    totalDiffValore += diffValore;
+    const effettivoGlobale = getGlobalRilevato(r.code, r);
+    const diffTotale = effettivoGlobale - r.atteso;
+    const diffValore = diffTotale * (r.standardCost || 0);
 
     tr.innerHTML = `
       <td>${esc(r.code)}</td>
@@ -457,21 +447,107 @@ function render() {
       <td class="num">${fmt(r.venduto)}</td>
       
       <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
-      <td class="grp-box">${isTotTab ? fmt(totBox) : renderMultiInput(currentTab, r.code, 'box')}</td>
+      <td class="grp-box">${isTotTab ? fmt(boxLocal) : renderMultiInput(currentTab, r.code, 'box')}</td>
       
       <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
-      <td class="grp-sleeve">${isTotTab ? fmt(totSleeve) : renderMultiInput(currentTab, r.code, 'sleeve')}</td>
+      <td class="grp-sleeve">${isTotTab ? fmt(sleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve')}</td>
       
-      <td class="grp-sfuso">${isTotTab ? fmt(totSfuso) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
+      <td class="grp-sfuso">${isTotTab ? fmt(sfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
       
       <td class="num">${fmt(r.atteso)}</td>
-      <td class="num cell-eff">${fmt(effettivo)}</td>
-      <td class="num cell-diff ${diff === 0 ? 'ok' : 'bad'}">${fmt(diff)}</td>
+      <td class="num cell-eff" id="eff-${r.code}">${fmt(effettivoGlobale)}</td>
+      <td class="num cell-diff ${diffTotale === 0 ? 'ok' : 'bad'}" id="diff-${r.code}">${fmt(diffTotale)}</td>
       <td class="num grp-valore">€ ${fmtMoney(r.standardCost || 0)}</td>
-      <td class="num grp-valore cell-val ${diffValore >= 0 ? 'ok' : 'bad'}">€ ${fmtMoney(diffValore)}</td>
+      <td class="num grp-valore cell-val ${diffValore >= 0 ? 'ok' : 'bad'}" id="val-${r.code}">€ ${fmtMoney(diffValore)}</td>
     `;
 
     $("tbody").appendChild(tr);
+  });
+
+  recalcKPIs();
+}
+
+function renderMultiInput(whIdx, code, type) {
+  const c = getCount(whIdx, code);
+  const arr = c[type];
+  let html = `<div class="input-scroll-cell" id="container-${code}-${type}">`;
+
+  arr.forEach((val, idx) => {
+    html += `<input class="qty-input" type="number" min="0" value="${val || ''}" 
+              oninput="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
+  });
+
+  if (arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
+    html += `<input class="qty-input" type="number" min="0" value="" placeholder="+" 
+              oninput="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)">`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+/* AGGIORNAMENTO FLUIDO: Non ridisegna la tabella per evitare perdita di focus */
+function updateCountValue(whIdx, code, type, idx, inputEl) {
+  const c = getCount(whIdx, code);
+  const val = inputEl.value;
+  c[type][idx] = n(val);
+
+  // Trova il riferimento al prodotto
+  const r = rows.find(x => x.code === code);
+  if (!r) return;
+
+  // Se l'utente ha inserito un numero nel campo "+" in fondo, aggiungiamo una nuova casella vuota accanto
+  const container = $(`container-${code}-${type}`);
+  if (container && idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
+    const newInput = document.createElement("input");
+    newInput.className = "qty-input";
+    newInput.type = "number";
+    newInput.min = "0";
+    newInput.value = "";
+    newInput.placeholder = "+";
+    newInput.oninput = function() { updateCountValue(whIdx, code, type, c[type].length, this); };
+    container.appendChild(newInput);
+  }
+
+  // Aggiorna solo i valori calcolati nella riga corrente
+  const effettivoGlobale = getGlobalRilevato(code, r);
+  const diffTotale = effettivoGlobale - r.atteso;
+  const diffValore = diffTotale * (r.standardCost || 0);
+
+  const effEl = $(`eff-${code}`);
+  const diffEl = $(`diff-${code}`);
+  const valEl = $(`val-${code}`);
+
+  if (effEl) effEl.textContent = fmt(effettivoGlobale);
+  if (diffEl) {
+    diffEl.textContent = fmt(diffTotale);
+    diffEl.className = `num cell-diff ${diffTotale === 0 ? 'ok' : 'bad'}`;
+  }
+  if (valEl) {
+    valEl.textContent = "€ " + fmtMoney(diffValore);
+    valEl.className = `num grp-valore cell-val ${diffValore >= 0 ? 'ok' : 'bad'}`;
+  }
+
+  saveCountsToStorage();
+  recalcKPIs();
+}
+
+/* Ricalcola i valori KPI globali in cima alla pagina */
+function recalcKPIs() {
+  let totalAttesoPezzi = 0;
+  let totalRilevatoPezzi = 0;
+  let totalDiffPezzi = 0;
+  let totalDiffValore = 0;
+
+  rows.forEach(r => {
+    const eff = getGlobalRilevato(r.code, r);
+    const diff = eff - r.atteso;
+    const val = diff * (r.standardCost || 0);
+
+    totalAttesoPezzi += r.atteso;
+    totalRilevatoPezzi += eff;
+    totalDiffPezzi += diff;
+    totalDiffValore += val;
   });
 
   $("kpiAtteso").textContent = fmt(totalAttesoPezzi);
@@ -481,37 +557,6 @@ function render() {
 
   $("kpiDiffBox").className = "kpi-card " + (totalDiffPezzi === 0 ? "success" : "warning");
   $("kpiValoreBox").className = "kpi-card " + (totalDiffValore >= 0 ? "success" : "warning");
-}
-
-function renderMultiInput(whIdx, code, type) {
-  const c = getCount(whIdx, code);
-  const arr = c[type];
-  let html = `<div class="input-scroll-cell">`;
-
-  arr.forEach((val, idx) => {
-    html += `<input class="qty-input" type="number" min="0" value="${val || ''}" 
-              oninput="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this.value)">`;
-  });
-
-  if (arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
-    html += `<input class="qty-input" type="number" min="0" value="" placeholder="+" 
-              oninput="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this.value)">`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function updateCountValue(whIdx, code, type, idx, val) {
-  const c = getCount(whIdx, code);
-  c[type][idx] = n(val);
-
-  while (c[type].length > 1 && n(c[type][c[type].length - 1]) === 0 && n(c[type][c[type].length - 2]) === 0) {
-    c[type].pop();
-  }
-
-  saveCountsToStorage();
-  render();
 }
 
 /* ---------------- ESPORTAZIONE EXCEL ---------------- */
@@ -534,15 +579,7 @@ function exportToExcel() {
   ];
 
   rows.forEach(r => {
-    let totBox = 0, totSleeve = 0, totSfuso = 0;
-    warehouses.forEach((_, idx) => {
-      const c = getCount(idx, r.code);
-      totBox += sumArr(c.box);
-      totSleeve += sumArr(c.sleeve);
-      totSfuso += sumArr(c.sfuso);
-    });
-
-    const effettivoTot = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+    const effettivoTot = getGlobalRilevato(r.code, r);
     const diffTot = effettivoTot - r.atteso;
     const diffVal = diffTot * (r.standardCost || 0);
 
