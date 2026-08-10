@@ -65,9 +65,7 @@ function updateHeaderTitle() {
 /* ---------------- SETUP & STORAGE ---------------- */
 function loadSetupFromStorage() {
   const savedCinema = localStorage.getItem("cinema_info_name");
-  if (savedCinema) {
-    cinemaName = savedCinema;
-  }
+  if (savedCinema) cinemaName = savedCinema;
   const savedWh = localStorage.getItem("cinema_warehouses");
   if (savedWh) {
     try { warehouses = JSON.parse(savedWh); } catch(e){}
@@ -76,21 +74,14 @@ function loadSetupFromStorage() {
 
 function handleCinemaSelectChange() {
   const sel = $("cinemaSelect").value;
-  if (sel === "__CUSTOM__") {
-    $("customCinemaDiv").style.display = "block";
-  } else {
-    $("customCinemaDiv").style.display = "none";
-  }
+  $("customCinemaDiv").style.display = (sel === "__CUSTOM__") ? "block" : "none";
 }
 
 function saveWarehousesSetup() {
   const sel = $("cinemaSelect").value;
   if (sel === "__CUSTOM__") {
     const customVal = $("customCinemaInput").value.trim();
-    if (!customVal) {
-      alert("Inserisci il nome della nuova sede!");
-      return;
-    }
+    if (!customVal) { alert("Inserisci il nome della nuova sede!"); return; }
     cinemaName = customVal;
   } else {
     cinemaName = sel;
@@ -104,10 +95,8 @@ function saveWarehousesSetup() {
     const val = inp.value.trim();
     if (val) newWh.push(val);
   });
-  if (newWh.length === 0) {
-    alert("Inserisci almeno un magazzino!");
-    return;
-  }
+  if (newWh.length === 0) { alert("Inserisci almeno un magazzino!"); return; }
+  
   warehouses = newWh;
   localStorage.setItem("cinema_warehouses", JSON.stringify(warehouses));
   
@@ -120,7 +109,6 @@ function renderSetupView() {
   $("tabContent").style.display = "none";
   $("setupView").style.display = "block";
   
-  // Popola il dropdown delle sedi
   const select = $("cinemaSelect");
   select.innerHTML = "";
 
@@ -129,14 +117,10 @@ function renderSetupView() {
     const opt = document.createElement("option");
     opt.value = c;
     opt.textContent = c;
-    if (c === cinemaName) {
-      opt.selected = true;
-      matched = true;
-    }
+    if (c === cinemaName) { opt.selected = true; matched = true; }
     select.appendChild(opt);
   });
 
-  // Opzione per aggiunta personalizzata
   const customOpt = document.createElement("option");
   customOpt.value = "__CUSTOM__";
   customOpt.textContent = "➕ Altro / Aggiungi nuovo cinema...";
@@ -149,7 +133,6 @@ function renderSetupView() {
   }
   select.appendChild(customOpt);
   
-  // Popola la lista dei magazzini
   const container = $("whList");
   container.innerHTML = "";
   warehouses.forEach((w) => {
@@ -213,7 +196,7 @@ function switchTab() {
   }
 }
 
-/* ---------------- EXCEL PARSING ---------------- */
+/* ---------------- EXCEL PARSING ROBUTO ---------------- */
 function readMatrix(file, preferredSheetName = "") {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -251,25 +234,43 @@ function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "
 function parseMag(m) {
   let header = -1;
   for (let i = 0; i < m.length; i++) {
-    if (m[i] && m[i].some(v => norm(v) === "OPENING BALANCE")) { header = i; break; }
+    if (m[i] && m[i].some(v => norm(v).includes("OPENING BALANCE") || norm(v).includes("INIZIALE"))) { 
+      header = i; 
+      break; 
+    }
   }
-  if (header < 0) throw new Error("Intestazione 'Opening Balance' non trovata.");
   
   const out = [];
-  for (let i = header + 1; i < m.length; i++) {
+  // Se non trova 'Opening Balance', scansiona da cima trovando le righe valide
+  const startRow = header >= 0 ? header + 1 : 0;
+
+  for (let i = startRow; i < m.length; i++) {
     const r = m[i];
-    if (!r) continue;
-    const code = text(r[1]), uom = text(r[2]);
-    if (!code || !uom) continue;
-    if (i + 1 >= m.length || !m[i + 1]) continue;
-    const name = text(m[i + 1][1]);
-    if (!name) continue;
+    if (!r || r.length < 2) continue;
     
+    const code = text(r[1]);
+    if (!code || norm(code).includes("CODICE") || norm(code).includes("TOTAL")) continue;
+
+    let name = "";
+    // Verifica se il nome è sulla riga sotto (formato a 2 righe) o sulla stessa riga
+    if (i + 1 < m.length && m[i + 1] && text(m[i + 1][1]) && !text(m[i + 1][2])) {
+      name = text(m[i + 1][1]);
+    } else {
+      name = text(r[2]) || code;
+    }
+
+    const uom = text(r[2]) || "PZ";
     const iniziale = n(r[5]), ricevuti = n(r[8]), trasferimenti = n(r[10]), rettifiche = n(r[12]);
     const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
-    const atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
     
+    let atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
+    if (isNaN(atteso) || atteso === 0) atteso = n(r[4]) || 0;
+
     out.push({ code, name, uom, iniziale, danni, venduto, atteso });
+  }
+
+  if (out.length === 0) {
+    throw new Error("Impossibile leggere i prodotti. Verifica la struttura del report Magazzino.");
   }
   return out;
 }
@@ -277,32 +278,43 @@ function parseMag(m) {
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
-    if (m[i] && m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
+    if (m[i] && m[i].some(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO", "NOME"].includes(norm(v)))) { 
+      h = i; 
+      break; 
+    }
   }
-  if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
 
-  const head = m[h];
-  let pCol = head.findIndex(v => norm(v) === "PRODOTTO");
-  let boxCol = head.findIndex(v => norm(v) === "BOX");
-  let sleeveCol = head.findIndex(v => norm(v) === "SLEEVE");
+  let pCol = 0, boxCol = 1, sleeveCol = 2;
+  if (h >= 0) {
+    const head = m[h];
+    pCol = head.findIndex(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO"].includes(norm(v)));
+    boxCol = head.findIndex(v => norm(v).includes("BOX"));
+    sleeveCol = head.findIndex(v => norm(v).includes("SLEEVE"));
 
-  if (pCol < 0) pCol = 0;      
-  if (boxCol < 0) boxCol = 1;  
-  if (sleeveCol < 0) sleeveCol = 2; 
+    if (pCol < 0) pCol = 0;
+    if (boxCol < 0) boxCol = 1;
+    if (sleeveCol < 0) sleeveCol = 2;
+  }
 
   const out = [];
-  for (let i = h + 1; i < m.length; i++) {
+  const startRow = h >= 0 ? h + 1 : 1;
+
+  for (let i = startRow; i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
 
     const name = text(r[pCol]);
-    if (!name || name === "#N/D" || norm(name) === "PRODOTTO") continue;
+    if (!name || name === "#N/D" || ["PRODOTTO", "DESCRIZIONE"].includes(norm(name))) continue;
 
     out.push({
       name,
       boxSize: n(r[boxCol]),
       sleeveSize: n(r[sleeveCol])
     });
+  }
+
+  if (out.length === 0) {
+    throw new Error("Nessuna anagrafica SIZE trovata nel file inserito.");
   }
   return out;
 }
