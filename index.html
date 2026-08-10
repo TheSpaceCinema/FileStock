@@ -26,16 +26,6 @@
     
     .info-card { text-align: center; color: #555; font-size: 1.1rem; padding: 25px; }
 
-  /* Intestazione della tabella fissa durante lo scroll */
-  table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background-color: #111; /* Sfondo scuro per coprire il testo che scorre sotto */
-    color: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  }
-
     /* SUMMARY KPI CARDS TOP */
     .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
     .kpi-card { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); border-left: 5px solid #1a237e; }
@@ -67,11 +57,17 @@
     .btn-warning:hover { background-color: #e65100; }
     .btn-danger { background-color: #d32f2f; color: white; }
 
-    /* TABELLA */
-    .table-container { overflow-x: auto; padding: 0; }
+    /* TABELLA CON BLOCCA RIQUADRO ATTIVO */
+    .table-container { 
+      max-height: 72vh; /* Altezza massima visibile prima dello scroll verticale */
+      overflow-y: auto;  /* Abilita lo scroll verticale all'interno del box */
+      overflow-x: auto;  /* Mantiene lo scroll orizzontale per le colonne larghe */
+      padding: 0; 
+      position: relative;
+    }
+    
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     th, td { border: 1px solid #e0e0e0; padding: 6px 8px; text-align: left; vertical-align: middle; }
-    th { background-color: #f1f3f5; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 2; }
     th.num, td.num { text-align: right; }
     
     .grp-box { background-color: #e3f2fd; }
@@ -147,7 +143,7 @@
       </div>
     </section>
 
-    <!-- SEZIONE CARICAMENTO FILE (ORA A 2 SOLI FILE) -->
+    <!-- SEZIONE CARICAMENTO FILE -->
     <section id="filesSection" class="card files-card">
       <div class="file-upload-block">
         <h3>1. Report Magazzino / Historical</h3>
@@ -204,7 +200,7 @@
         </button>
       </div>
 
-      <!-- TABELLA DATI -->
+      <!-- TABELLA DATI CON SCROLL VERTICALE E HEADER FISSO -->
       <div class="table-container card">
         <table>
           <thead id="thead"></thead>
