@@ -235,6 +235,15 @@ function readMatrix(file, preferredSheetName = "") {
 }
 
 function text(v) { return String(v ?? "").trim(); }
+function cleanCode(val) {
+  if (val === null || val === undefined) return "";
+  let s = text(val);
+  if (/^\d+$/.test(s)) {
+    s = String(parseInt(s, 10));
+  }
+  return s;
+}
+
 function n(v) {
   if (typeof v === "number") return v;
   let s = text(v).replace(/\s/g, "").replace(/€/g, "");
@@ -248,17 +257,14 @@ function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "
 
 function parseMag(m) {
   let headerRow = -1;
-  let codeCol = 1, nameCol = 2, uomCol = 3;
-  let costCol = -1;
+  let codeCol = -1, nameCol = -1, uomCol = -1, costCol = -1;
 
-  // 1. Cerca la riga di intestazione per mappare correttamente le colonne
+  // 1. Cerca la riga di intestazione
   for (let i = 0; i < m.length; i++) {
     if (!m[i]) continue;
     const rowStr = m[i].map(v => norm(v)).join(" ");
     if (rowStr.includes("OPENING BALANCE") || rowStr.includes("INIZIALE") || rowStr.includes("CODICE") || rowStr.includes("DESCRIZIONE")) {
       headerRow = i;
-      
-      // Mappatura dinamica delle colonne se presenti i nomi
       m[i].forEach((cell, colIdx) => {
         const c = norm(cell);
         if (c.includes("CODICE") || c.includes("CODE") || c.includes("ITEM NO")) codeCol = colIdx;
@@ -270,6 +276,10 @@ function parseMag(m) {
     }
   }
 
+  if (codeCol === -1) codeCol = 1;
+  if (nameCol === -1) nameCol = 2;
+  if (uomCol === -1) uomCol = 3;
+
   const startRow = headerRow >= 0 ? headerRow + 1 : 1;
   const out = [];
 
@@ -277,15 +287,20 @@ function parseMag(m) {
     const r = m[i];
     if (!r || r.length < 3) continue;
 
-    const code = text(r[codeCol]);
+    const rawCode = text(r[codeCol]);
+    const code = cleanCode(rawCode);
     let name = text(r[nameCol]);
     let uom = text(r[uomCol]) || "PZ";
 
-    // Se per qualche motivo 'name' è "PZ" o "pz" e l'altra colonna ha il testo lungo, invertiamo
-    if ((norm(name) === "PZ" || norm(name) === "KG" || norm(name) === "NR" || name.length <= 2) && text(r[uomCol]).length > 2) {
-      const temp = name;
-      name = text(r[uomCol]);
-      uom = temp;
+    // Se name è solo U.M. (es. "pz"), cerca la descrizione in altre celle della riga
+    if (!name || norm(name) === "PZ" || norm(name) === "KG" || norm(name) === "NR" || name.length <= 2) {
+      for (let cIdx = 0; cIdx < r.length; cIdx++) {
+        const val = text(r[cIdx]);
+        if (val && val.length > 2 && norm(val) !== "PZ" && norm(val) !== norm(rawCode) && !norm(val).includes("TOTAL")) {
+          name = val;
+          break;
+        }
+      }
     }
 
     if (!code || !name) continue;
@@ -302,7 +317,7 @@ function parseMag(m) {
       atteso = n(r[4]) || 0;
     }
 
-    out.push({ code, name, uom: uom.toUpperCase(), iniziale, danni, venduto, atteso, standardCost });
+    out.push({ rawCode, code, name, uom: uom.toUpperCase(), iniziale, danni, venduto, atteso, standardCost });
   }
 
   if (out.length === 0) {
@@ -314,23 +329,24 @@ function parseMag(m) {
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
-    if (m[i] && m[i].some(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO", "NOME"].includes(norm(v)))) { 
+    if (m[i] && m[i].some(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO", "NOME", "CODICE", "CODE"].includes(norm(v)))) { 
       h = i; 
       break; 
     }
   }
 
-  let pCol = 0, boxCol = 1, sleeveCol = 2;
+  let codeCol = -1, pCol = -1, boxCol = -1, sleeveCol = -1;
   if (h >= 0) {
     const head = m[h];
-    pCol = head.findIndex(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO"].includes(norm(v)));
+    codeCol = head.findIndex(v => ["CODICE", "CODE", "ITEM NO"].includes(norm(v)));
+    pCol = head.findIndex(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO", "NAME"].includes(norm(v)));
     boxCol = head.findIndex(v => norm(v).includes("BOX"));
     sleeveCol = head.findIndex(v => norm(v).includes("SLEEVE"));
-
-    if (pCol < 0) pCol = 0;
-    if (boxCol < 0) boxCol = 1;
-    if (sleeveCol < 0) sleeveCol = 2;
   }
+
+  if (pCol < 0) pCol = 0;
+  if (boxCol < 0) boxCol = 1;
+  if (sleeveCol < 0) sleeveCol = 2;
 
   const out = [];
   const startRow = h >= 0 ? h + 1 : 1;
@@ -339,10 +355,14 @@ function parseSize(m) {
     const r = m[i];
     if (!r || !r.length) continue;
 
+    const rawCode = codeCol >= 0 ? text(r[codeCol]) : "";
+    const code = cleanCode(rawCode);
     const name = text(r[pCol]);
-    if (!name || name === "#N/D" || ["PRODOTTO", "DESCRIZIONE"].includes(norm(name))) continue;
+
+    if ((!name && !code) || name === "#N/D" || ["PRODOTTO", "DESCRIZIONE"].includes(norm(name))) continue;
 
     out.push({
+      code,
       name,
       boxSize: n(r[boxCol]),
       sleeveSize: n(r[sleeveCol])
@@ -362,11 +382,26 @@ function build() {
     return;
   }
 
-  const sm = new Map(size.map(x => [norm(x.name), x]));
+  // Mappe per abbinamento per Codice e per Nome
+  const sizeByCode = new Map();
+  const sizeByName = new Map();
+
+  size.forEach(s => {
+    if (s.code) sizeByCode.set(s.code, s);
+    if (s.name) sizeByName.set(norm(s.name), s);
+  });
+
   rows = mag.map(x => {
-    const s = sm.get(norm(x.name)) || {};
+    let s = sizeByCode.get(x.code) || sizeByName.get(norm(x.name)) || {};
+    
+    let finalName = x.name;
+    if (s.name && (norm(finalName) === "PZ" || finalName.length <= 2)) {
+      finalName = s.name;
+    }
+
     return { 
       ...x, 
+      name: finalName,
       boxSize: s.boxSize || 0, 
       sleeveSize: s.sleeveSize || 0
     };
@@ -398,7 +433,6 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
-// Calcola la quantità rilevata GLOBALE (somma di TUTTI i magazzini)
 function getGlobalRilevato(code, r) {
   let totBox = 0, totSleeve = 0, totSfuso = 0;
   warehouses.forEach((_, idx) => {
@@ -514,7 +548,6 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   const r = rows.find(x => x.code === code);
   if (!r) return;
 
-  // Aggiunge nuova casella "+" se compilata l'ultima, senza distruggere quelle esistenti
   const container = $(`container-${code}-${type}`);
   if (container && idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
     const newInput = document.createElement("input");
@@ -529,7 +562,6 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
     container.appendChild(newInput);
   }
 
-  // Aggiorna solo il calcolo GLOBALE della riga corrente
   const effettivoGlobale = getGlobalRilevato(code, r);
   const diffTotale = effettivoGlobale - r.atteso;
   const diffValore = diffTotale * (r.standardCost || 0);
