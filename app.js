@@ -6,7 +6,6 @@ let countsData = {};
 
 const MAX_FIELDS = 10;
 
-// Lista delle 36 sedi attuali
 const DEFAULT_CINEMAS = [
   "TSC Beinasco", "TSC Belpasso", "TSC Bologna", "TSC Casamassima", "TSC Catanzaro",
   "TSC Cerro Maggiore", "TSC Corciano", "TSC Firenze", "TSC Genova", "TSC Grosseto",
@@ -199,12 +198,6 @@ function renderTabs() {
   totBtn.textContent = `📊 RIEPILOGO TOTALE`;
   totBtn.onclick = () => { currentTab = 'tot'; switchTab(); };
   bar.appendChild(totBtn);
-
-  const setupBtn = document.createElement("button");
-  setupBtn.className = `tab-btn setup-btn ${currentTab === 'setup' ? 'active' : ''}`;
-  setupBtn.textContent = `⚙️ Setup Magazzini`;
-  setupBtn.onclick = () => { currentTab = 'setup'; switchTab(); };
-  bar.appendChild(setupBtn);
 }
 
 function switchTab() {
@@ -253,45 +246,45 @@ function n(v) {
 }
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
+/* PARSING CORRETTO MAGAZZINO (Pulisce categorie e accoppiamenti errati) */
 function parseMag(m) {
-  let header = -1;
+  let startRow = -1;
   let costCol = -1;
 
   for (let i = 0; i < m.length; i++) {
     if (m[i] && m[i].some(v => norm(v).includes("OPENING BALANCE") || norm(v).includes("INIZIALE"))) { 
-      header = i; 
-      // Cerca la colonna del Costo/Standard Cost nell'intestazione se presente
+      startRow = i + 1; 
       costCol = m[i].findIndex(v => norm(v).includes("COST") || norm(v).includes("COSTO") || norm(v).includes("PREZZO"));
       break; 
     }
   }
   
+  if (startRow < 0) startRow = 1;
+
   const out = [];
-  const startRow = header >= 0 ? header + 1 : 0;
 
   for (let i = startRow; i < m.length; i++) {
     const r = m[i];
-    if (!r || r.length < 2) continue;
+    if (!r || r.length < 3) continue;
     
     const code = text(r[1]);
-    if (!code || norm(code).includes("CODICE") || norm(code).includes("TOTAL")) continue;
+    const name = text(r[2]);
 
-    let name = "";
-    if (i + 1 < m.length && m[i + 1] && text(m[i + 1][1]) && !text(m[i + 1][2])) {
-      name = text(m[i + 1][1]);
-    } else {
-      name = text(r[2]) || code;
-    }
+    // Ignora righe vuote, intestazioni, sezioni di categoria (es. FOOD, Concessions Store room) o totali
+    if (!code || !name) continue;
+    if (norm(code) === norm(name)) continue; // Filtra le righe di categoria dove codice e nome coincidono
+    if (norm(code).includes("CODICE") || norm(code).includes("TOTAL") || norm(code).includes("STORE ROOM")) continue;
 
-    const uom = text(r[2]) || "PZ";
+    const uom = text(r[3]) || "PZ";
     const iniziale = n(r[5]), ricevuti = n(r[8]), trasferimenti = n(r[10]), rettifiche = n(r[12]);
     const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
     
-    // Recupero del costo standard (se presente nella colonna identificata o di default in colonna 22/23 se presente)
     const standardCost = costCol >= 0 ? n(r[costCol]) : (r[22] !== undefined ? n(r[22]) : 0);
 
     let atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
-    if (isNaN(atteso) || atteso === 0) atteso = n(r[4]) || 0;
+    if (isNaN(atteso) || (iniziale === 0 && venduto === 0 && atteso === 0)) {
+      atteso = n(r[4]) || 0;
+    }
 
     out.push({ code, name, uom, iniziale, danni, venduto, atteso, standardCost });
   }
@@ -352,6 +345,7 @@ function build() {
     $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> · SIZE: <b>${size.length}</b><br>Carica entrambi i file per continuare.`;
     return;
   }
+
   const sm = new Map(size.map(x => [norm(x.name), x]));
   rows = mag.map(x => {
     const s = sm.get(norm(x.name)) || {};
@@ -362,8 +356,13 @@ function build() {
     };
   });
 
+  // NASCONDE UPLOAD E MOSTRA TABELLA AUTOMATICAMENTE
   $("filesSection").style.display = "none";
   $("mainStatus").style.display = "none";
+  $("setupView").style.display = "none";
+  $("tabContent").style.display = "block";
+
+  if (typeof currentTab === 'string') currentTab = 0;
 
   renderTabs();
   render();
@@ -374,7 +373,6 @@ function getCount(whIdx, code) {
   if (!countsData[whIdx]) countsData[whIdx] = {};
   if (!countsData[whIdx][code]) countsData[whIdx][code] = { box: [0], sleeve: [0], sfuso: [0] };
   
-  // Garantisce il formato array per inserimenti multipli
   const c = countsData[whIdx][code];
   if (!Array.isArray(c.box)) c.box = [n(c.box)];
   if (!Array.isArray(c.sleeve)) c.sleeve = [n(c.sleeve)];
@@ -476,7 +474,6 @@ function render() {
     $("tbody").appendChild(tr);
   });
 
-  // Aggiorna schede KPI in alto
   $("kpiAtteso").textContent = fmt(totalAttesoPezzi);
   $("kpiRilevato").textContent = fmt(totalRilevatoPezzi);
   $("kpiDiffPezzi").textContent = fmt(totalDiffPezzi);
@@ -486,7 +483,6 @@ function render() {
   $("kpiValoreBox").className = "kpi-card " + (totalDiffValore >= 0 ? "success" : "warning");
 }
 
-/* Generatore Caselle Multi-Input */
 function renderMultiInput(whIdx, code, type) {
   const c = getCount(whIdx, code);
   const arr = c[type];
@@ -510,7 +506,6 @@ function updateCountValue(whIdx, code, type, idx, val) {
   const c = getCount(whIdx, code);
   c[type][idx] = n(val);
 
-  // Pulisce valori vuoti finali
   while (c[type].length > 1 && n(c[type][c[type].length - 1]) === 0 && n(c[type][c[type].length - 2]) === 0) {
     c[type].pop();
   }
@@ -533,7 +528,6 @@ function exportToExcel() {
 
   const wb = XLSX.utils.book_new();
 
-  // --- FOGLIO 1: RIEPILOGO TOTALE ---
   const totData = [
     [`CINEMA / SEDE: ${cinemaName.toUpperCase()}`],
     ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale", "Differenza Pezzi", "Costo Standard", "Differenza Valore (€)"]
@@ -570,7 +564,6 @@ function exportToExcel() {
   const wsTot = XLSX.utils.aoa_to_sheet(totData);
   XLSX.utils.book_append_sheet(wb, wsTot, "Riepilogo Totale");
 
-  // --- FOGLI PER SINGOLO MAGAZZINO ---
   warehouses.forEach((whName, idx) => {
     const whData = [
       [`MAGAZZINO: ${whName.toUpperCase()} — SEDE: ${cinemaName.toUpperCase()}`],
