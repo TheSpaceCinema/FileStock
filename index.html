@@ -3,20 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gestione Magazzino v3</title>
+<title>Gestione Magazzino Multilivello v4</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box}
 body{font-family:Arial,sans-serif;margin:0;background:#f3f5f7;color:#17202a}
 main{max-width:1800px;margin:auto;padding:20px}
-h1{margin:0 0 16px;font-size:26px}
+h1{margin:0 0 16px;font-size:24px;display:flex;justify-content:space-between;align-items:center}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px #0001}
-h3{margin:0 0 10px;font-size:16px}
+h3{margin:0 0 10px;font-size:15px}
 .status{margin-top:8px;color:#555;font-size:13px}
+
+/* TAB NAVIGATION */
+.tabs-bar{display:flex;gap:8px;margin-top:20px;border-bottom:2px solid #ccc;overflow-x:auto;padding-bottom:2px}
+.tab-btn{padding:10px 18px;border:none;background:#e2e8f0;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;font-size:13px;color:#475569;white-space:nowrap}
+.tab-btn.active{background:#2563eb;color:#fff}
+.tab-btn.setup-btn{background:#475569;color:#fff;margin-left:auto}
+
+/* TOOLBAR & TABLE */
 .toolbar{margin-top:16px;display:flex;gap:10px;align-items:center}
 .search{flex:1;padding:10px;border:1px solid #bbb;border-radius:8px;font-size:14px}
-.tablewrap{margin-top:16px;overflow:auto;max-height:72vh}
+.tablewrap{margin-top:16px;overflow:auto;max-height:65vh}
 .table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
 th,td{padding:6px 8px;border-bottom:1px solid #ddd;white-space:nowrap}
 th{position:sticky;top:0;background:#eef1f4;z-index:2;border-right:1px solid #ccc;font-weight:600}
@@ -28,16 +36,30 @@ th{position:sticky;top:0;background:#eef1f4;z-index:2;border-right:1px solid #cc
 .ok{color:#17823b;font-weight:bold}
 .bad{color:#c62828;font-weight:bold}
 .note{margin-top:12px;font-size:12px;color:#666}
-.error{color:#b00020;font-weight:bold}
-@media(max-width:800px){main{padding:12px}.grid{grid-template-columns:1fr}}
+
+/* SETUP FORM */
+.setup-box{display:flex;flex-direction:column;gap:12px;max-width:500px;margin:20px auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 8px #0002}
+.wh-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.wh-item{display:flex;gap:8px;align-items:center}
+.wh-item input{flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:6px}
+.btn{padding:8px 14px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-weight:bold}
+.btn-danger{background:#dc2626}
+.btn-sec{background:#64748b}
+
+.toggle-header{font-size:12px;color:#2563eb;cursor:pointer;text-decoration:underline;margin-top:6px;display:inline-block}
 </style>
 </head>
 <body>
 <main>
-  <h1>Gestione Magazzino v3</h1>
-  <div class="grid">
+  <h1>
+    <span>Gestione Magazzino Cinema v4</span>
+    <button class="btn btn-sec" onclick="toggleFilesSection()">📁 Caricamento File</button>
+  </h1>
+
+  <!-- SEZIONE CARICAMENTO FILE -->
+  <div id="filesSection" class="grid">
     <div class="card">
-      <h3>1. File Magazzino</h3>
+      <h3>1. File Magazzino (Report Stock)</h3>
       <input id="magFile" type="file" accept=".xls,.xlsx,.xlsm">
       <div id="magStatus" class="status">Nessun file caricato</div>
     </div>
@@ -47,35 +69,42 @@ th{position:sticky;top:0;background:#eef1f4;z-index:2;border-right:1px solid #cc
       <div id="sizeStatus" class="status">Nessun file caricato</div>
     </div>
   </div>
-  <div id="mainStatus" class="card" style="margin-top:16px">Carica entrambi i file per iniziare la conta.</div>
-  <div class="card toolbar">
-    <input id="search" class="search" placeholder="Cerca prodotto per codice o nome...">
-    <span id="count"></span>
+
+  <div id="mainStatus" class="card" style="margin-top:16px">Carica i file e configura i magazzini per iniziare.</div>
+
+  <!-- TABS DI NAVIGAZIONE -->
+  <div class="tabs-bar" id="tabsBar"></div>
+
+  <!-- CONTENUTO PRINCIPALE -->
+  <div id="tabContent">
+    <div class="card toolbar">
+      <input id="search" class="search" placeholder="Cerca prodotto per codice o nome...">
+      <span id="count"></span>
+    </div>
+
+    <div class="card tablewrap">
+      <table class="table">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
   </div>
-  <div class="card tablewrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th colspan="3">PRODOTTO</th>
-          <th colspan="3">REPORT MAGAZZINO</th>
-          <th colspan="2" class="grp-box">BOX</th>
-          <th colspan="2" class="grp-sleeve">SLEEVE</th>
-          <th class="grp-sfuso">SFUSO</th>
-          <th colspan="3">CONFRONTO CONTA</th>
-        </tr>
-        <tr>
-          <th>Codice</th><th>Prodotto</th><th>U.M.</th>
-          <th class="num">Iniziale</th><th class="num">Danni</th><th class="num">Venduto</th>
-          <th class="num grp-box">Size</th><th class="num grp-box">Q.tà Box</th>
-          <th class="num grp-sleeve">Size</th><th class="num grp-sleeve">Q.tà Sleeve</th>
-          <th class="num grp-sfuso">Q.tà Sfuso</th>
-          <th class="num">Atteso</th><th class="num">Effettivo</th><th class="num">Diff.</th>
-        </tr>
-      </thead>
-      <tbody id="body"></tbody>
-    </table>
+
+  <!-- SCHEDA SETUP -->
+  <div id="setupView" style="display:none">
+    <div class="setup-box">
+      <h2>⚙️ Configurazione Magazzini Cinema</h2>
+      <p style="font-size:13px;color:#666">Definisci i punti di stoccaggio o vendita del cinema (es. Bar Centrale, Deposito, Popcorn Stand).</p>
+      
+      <div class="wh-list" id="whList"></div>
+
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-sec" onclick="addWarehouseInput()">+ Aggiungi Magazzino</button>
+        <button class="btn" onclick="saveWarehousesSetup()">Salva e Applica</button>
+      </div>
+    </div>
   </div>
-  <div class="note">Inserisci le quantità nei campi Box, Sleeve o Sfuso. Il totale Effettivo e la Differenza si aggiornano automaticamente.</div>
+
 </main>
 <script src="app.js" defer></script>
 </body>
