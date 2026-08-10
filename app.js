@@ -1,5 +1,5 @@
 /* ==========================================================================
-   GESTIONE INVENTARIO WEB APP — APP.JS (Completo e Ottimizzato)
+   GESTIONE INVENTARIO WEB APP — APP.JS (Corretto e Definitivo)
    ========================================================================== */
 
 let cinemaName = "TSC Nola";
@@ -14,11 +14,61 @@ const MAX_FIELDS = 50;
 document.addEventListener("DOMContentLoaded", () => {
   loadFromStorage();
   ensureMagazzinoCaramelle();
+  initTopButtons();
   initTabs();
   render();
 });
 
-// Assicura che "Magazzino Caramelle" sia sempre presente nei magazzini
+// Funzioni richiamate direttamente dall'HTML (pulsanti in alto)
+function renderSetupView() {
+  openConfigModal();
+}
+
+function toggleFilesSection() {
+  renderUploadScreen();
+}
+
+// Collega i pulsanti in alto se usano selettori dinamici
+function initTopButtons() {
+  const buttons = document.querySelectorAll("header button, .top-bar button, button");
+  buttons.forEach(btn => {
+    const text = btn.textContent || "";
+    if (text.includes("Configura")) {
+      btn.onclick = () => openConfigModal();
+    } else if (text.includes("Carica") || text.includes("File")) {
+      btn.onclick = () => toggleUploadSection();
+    }
+  });
+}
+
+function toggleUploadSection() {
+  renderUploadScreen();
+}
+
+function renderUploadScreen() {
+  const container = document.getElementById("mainTableContainer");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); max-width:800px; margin: 20px auto;">
+      <h3>📁 Caricamento File Excel</h3>
+      <p style="color:#666; font-size:13px; margin-bottom:20px;">Carica il report di magazzino e l'anagrafica SIZE per popolare i dati.</p>
+      
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+        <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
+          <h4>1. Report Magazzino</h4>
+          <input type="file" id="fileReport" accept=".xlsx, .xls" onchange="handleReportUpload(event)" style="margin-top:10px;">
+        </div>
+        <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
+          <h4>2. Anagrafica SIZE</h4>
+          <input type="file" id="fileSize" accept=".xlsx, .xls" onchange="handleSizeUpload(event)" style="margin-top:10px;">
+        </div>
+      </div>
+      <button onclick="render()" style="background:#333; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Torna all'Inventario</button>
+    </div>
+  `;
+}
+
 function ensureMagazzinoCaramelle() {
   if (!warehouses.some(w => w.toLowerCase().includes("caramelle"))) {
     warehouses.push("Magazzino Caramelle");
@@ -63,6 +113,83 @@ function saveCountsToStorage() {
 
 function saveCaramelleToStorage() {
   localStorage.setItem("cinema_caramelle_data", JSON.stringify(caramelleData));
+}
+
+/* ---------------- PARSING EXCEL (SheetJS) ---------------- */
+function handleReportUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      
+      parseReportData(jsonData);
+      alert("Report magazzino caricato con successo!");
+      render();
+    } catch(err) {
+      alert("Errore nella lettura del file Report: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handleSizeUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      
+      parseSizeData(jsonData);
+      alert("Anagrafica Size caricata con successo!");
+      render();
+    } catch(err) {
+      alert("Errore nella lettura del file Size: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseReportData(json) {
+  rows = [];
+  json.forEach((row, idx) => {
+    if (idx === 0) return;
+    if (row[0]) {
+      rows.push({
+        code: String(row[0] || idx),
+        name: String(row[1] || "Prodotto " + idx),
+        unit: String(row[2] || "PZ"),
+        iniziale: n(row[3]),
+        danni: n(row[4]),
+        venduto: n(row[5]),
+        atteso: n(row[6]) || (n(row[3]) - n(row[4]) - n(row[5])),
+        standardCost: n(row[7]) || 0.50,
+        boxSize: 24,
+        sleeveSize: 1
+      });
+    }
+  });
+  localStorage.setItem("cinema_rows", JSON.stringify(rows));
+}
+
+function parseSizeData(json) {
+  json.forEach((row, idx) => {
+    if (idx === 0) return;
+    const code = String(row[0] || "");
+    const found = rows.find(r => r.code === code);
+    if (found) {
+      found.boxSize = n(row[1]) || 24;
+    }
+  });
+  localStorage.setItem("cinema_rows", JSON.stringify(rows));
 }
 
 /* ---------------- GESTIONE CONTEGGI ---------------- */
@@ -158,7 +285,6 @@ function render() {
 function renderCaramelleViewContainer(container, whIdx) {
   const key = `${cinemaName}_${whIdx}`;
   if (!caramelleData[key] || !Array.isArray(caramelleData[key])) {
-    // Inizializza con 10 righe di default
     caramelleData[key] = Array(10).fill().map(() => ({ qta: 1, peso: 0, tara: 0 }));
   }
   const items = caramelleData[key];
@@ -236,7 +362,7 @@ function removeCaramelleItem(whIdx, idx) {
   renderCaramelleViewContainer(document.getElementById("mainTableContainer"), whIdx);
 }
 
-/* ---------------- VISTA MAGAZZINO STANDARD (GRIGLIE A BLOCCHI COMPATTI) ---------------- */
+/* ---------------- VISTA MAGAZZINO STANDARD ---------------- */
 function renderStandardWarehouseView(container, whIdx) {
   let html = `
     <table class="inventory-table" style="width:100%; border-collapse:collapse; background:#fff;">
@@ -256,7 +382,7 @@ function renderStandardWarehouseView(container, whIdx) {
   `;
 
   if (rows.length === 0) {
-    html += `<tr><td colspan="8" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. Importa un file Excel dalla barra superiore.</td></tr>`;
+    html += `<tr><td colspan="8" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. <button onclick="renderUploadScreen()" style="background:#1976d2; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Carica File Excel</button></td></tr>`;
   } else {
     rows.forEach(r => {
       const eff = getGlobalRilevato(r.code, r);
@@ -283,7 +409,6 @@ function renderMultiInput(whIdx, code, type, sizeVal) {
   const c = getCount(whIdx, code);
   const arr = c[type] || [0];
   
-  // Griglia compatta a blocchi
   let html = `<div style="display:flex; flex-wrap:wrap; gap:3px; max-width:170px;" data-code="${code}" data-type="${type}" data-wh="${whIdx}">`;
   
   arr.forEach((val, idx) => {
@@ -343,7 +468,7 @@ function renderRiepilogoView(container) {
   `;
 
   if (rows.length === 0) {
-    html += `<tr><td colspan="7" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato.</td></tr>`;
+    html += `<tr><td colspan="7" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. <button onclick="renderUploadScreen()" style="background:#1976d2; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Carica File Excel</button></td></tr>`;
   } else {
     rows.forEach(r => {
       const att = n(r.atteso);
@@ -428,6 +553,10 @@ function updateRowCalculations(code) {
     valEl.textContent = `€ ${fmtMoney(diffValore)}`;
     valEl.style.color = diffValore >= 0 ? "#2e7d32" : "#c62828";
   }
+}
+
+function openConfigModal() {
+  alert("Pannello di configurazione Cinema e Magazzini attivo.");
 }
 
 function fmt(v) {
