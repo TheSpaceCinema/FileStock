@@ -19,8 +19,7 @@
     .container { max-width: 1600px; margin: 20px auto; padding: 0 15px; }
     .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
     
-    .files-card { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 768px) { .files-card { grid-template-columns: 1fr; } }
+    .files-card { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
     .file-upload-block { border: 2px dashed #ccc; padding: 20px; border-radius: 6px; text-align: center; background: #fafafa; }
     .file-upload-block h3 { margin-bottom: 10px; font-size: 1.1rem; color: #1a237e; }
     .status-text { margin-top: 10px; font-size: 0.9rem; color: #2e7d32; font-weight: bold; }
@@ -144,18 +143,23 @@
       <div class="file-upload-block">
         <h3>1. Report Magazzino</h3>
         <input type="file" id="magFile" accept=".xlsx, .xls">
-        <p id="magStatus" class="status-text">Seleziona il report di magazzino (.xlsx)</p>
+        <p id="magStatus" class="status-text">Seleziona il report (.xlsx)</p>
       </div>
       <div class="file-upload-block">
         <h3>2. Anagrafica SIZE</h3>
         <input type="file" id="sizeFile" accept=".xlsx, .xls">
         <p id="sizeStatus" class="status-text">Seleziona l'anagrafica SIZE (.xlsx)</p>
       </div>
+      <div class="file-upload-block">
+        <h3>3. File Historical (Costi)</h3>
+        <input type="file" id="histFile" accept=".xlsx, .xls">
+        <p id="histStatus" class="status-text">Seleziona Historical (.xlsx)</p>
+      </div>
     </section>
 
     <!-- STATO AVVISO INIZIALE -->
     <div id="mainStatus" class="card info-card">
-      📂 Carica entrambi i file Excel in alto per visualizzare la tabella dei prodotti.
+      📂 Carica il **Report Magazzino** e l'**Anagrafica SIZE** per iniziare (il file **Historical** permette di valorizzare i costi escl. Tax).
     </div>
 
     <!-- CONTENUTO TABELLA & TABS -->
@@ -208,13 +212,13 @@
   </main>
 
   <script>
-    let mag = [], size = [], rows = [];
+    let mag = [], size = [], histMap = new Map(), rows = [];
     let cinemaName = "TSC Beinasco";
     let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
     let currentTab = 0; 
     let countsData = {}; 
 
-    const MAX_FIELDS = 10; // Fino a 10 caselle inserimento per tipo
+    const MAX_FIELDS = 10;
 
     const DEFAULT_CINEMAS = [
       "TSC Beinasco", "TSC Belpasso", "TSC Bologna", "TSC Casamassima", "TSC Catanzaro",
@@ -260,6 +264,20 @@
         }).catch(err => {
           $("sizeStatus").textContent = "❌ Errore file SIZE";
           showError("Errore file SIZE: " + err.message);
+        });
+      });
+
+      $("histFile").addEventListener("change", e => {
+        const f = e.target.files[0];
+        if (!f) return;
+        $("histStatus").textContent = "Lettura Historical in corso...";
+        readMatrix(f).then(m => {
+          histMap = parseHistorical(m);
+          $("histStatus").textContent = `✓ ${f.name} (${histMap.size} costi caricati)`;
+          build();
+        }).catch(err => {
+          $("histStatus").textContent = "❌ Errore file Historical";
+          showError("Errore file Historical: " + err.message);
         });
       });
 
@@ -448,22 +466,51 @@
     }
     function norm(v) { return text(v).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
+    function parseHistorical(m) {
+      let headIdx = -1;
+      for (let i = 0; i < m.length; i++) {
+        if (m[i] && m[i].some(v => norm(v).includes("STD COST") || norm(v).includes("COST"))) {
+          headIdx = i; break;
+        }
+      }
+      if (headIdx < 0) {
+        for (let i = 0; i < Math.min(20, m.length); i++) {
+          if (m[i] && m[i].length > 2) { headIdx = i; break; }
+        }
+      }
+
+      const map = new Map();
+      if (headIdx < 0) return map;
+
+      const head = m[headIdx];
+      let costCol = head.findIndex(v => norm(v).includes("STD COST") || norm(v).includes("EXCL"));
+      if (costCol < 0) costCol = head.findIndex(v => norm(v).includes("COST") || norm(v).includes("PREZZO"));
+
+      let codeCol = head.findIndex(v => norm(v).includes("COD") || norm(v).includes("ITEM") || norm(v).includes("SKU") || norm(v).includes("ARTICLE"));
+      let nameCol = head.findIndex(v => norm(v).includes("PROD") || norm(v).includes("DESC") || norm(v).includes("NAME"));
+
+      if (codeCol < 0) codeCol = 0;
+      if (nameCol < 0) nameCol = 1;
+
+      for (let i = headIdx + 1; i < m.length; i++) {
+        const r = m[i];
+        if (!r || !r.length) continue;
+        const code = text(r[codeCol]);
+        const name = text(r[nameCol]);
+        const cost = costCol >= 0 ? n(r[costCol]) : 0;
+
+        if (code) map.set("C_" + norm(code), cost);
+        if (name) map.set("N_" + norm(name), cost);
+      }
+      return map;
+    }
+
     function parseMag(m) {
       let header = -1;
       for (let i = 0; i < m.length; i++) {
         if (m[i] && m[i].some(v => norm(v) === "OPENING BALANCE")) { header = i; break; }
       }
       if (header < 0) throw new Error("Intestazione 'Opening Balance' non trovata nel report.");
-      
-      const headRow = m[header];
-      // Individua colonna Prezzo o Costo se presente
-      let unitPriceCol = -1;
-      headRow.forEach((colName, idx) => {
-        const c = norm(colName);
-        if (c.includes("PREZZO") || c.includes("COSTO") || c.includes("UNIT") || c.includes("VALORE")) {
-          unitPriceCol = idx;
-        }
-      });
 
       const out = [];
       for (let i = header + 1; i < m.length; i++) {
@@ -479,9 +526,8 @@
         const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
         
         const atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
-        const unitPrice = unitPriceCol >= 0 ? n(r[unitPriceCol]) : 1; // Default a 1 se non specificato
 
-        out.push({ code, name, uom, iniziale, danni, venduto, atteso, unitPrice });
+        out.push({ code, name, uom, iniziale, danni, venduto, atteso });
       }
       return out;
     }
@@ -525,10 +571,20 @@
       const sm = new Map(size.map(x => [norm(x.name), x]));
       rows = mag.map(x => {
         const s = sm.get(norm(x.name)) || {};
+        
+        // Recupero Costo dal file Historical
+        let unitCost = 0;
+        if (histMap.has("C_" + norm(x.code))) {
+          unitCost = histMap.get("C_" + norm(x.code));
+        } else if (histMap.has("N_" + norm(x.name))) {
+          unitCost = histMap.get("N_" + norm(x.name));
+        }
+
         return { 
           ...x, 
           boxSize: s.boxSize || 0, 
-          sleeveSize: s.sleeveSize || 0
+          sleeveSize: s.sleeveSize || 0,
+          stdCost: unitCost
         };
       });
 
@@ -586,7 +642,7 @@
         const rel = getGlobalProductTotals(r.code);
         totRilevato += rel;
         const diffPezzi = rel - r.atteso;
-        totDiffValore += (diffPezzi * (r.unitPrice || 1));
+        totDiffValore += (diffPezzi * (r.stdCost || 0));
       });
 
       const totDiffPezzi = totRilevato - totAtteso;
@@ -619,7 +675,7 @@
           <th colspan="2" class="grp-box">BOX</th>
           <th colspan="2" class="grp-sleeve">SLEEVE</th>
           <th class="grp-sfuso">SFUSO</th>
-          <th colspan="5" class="grp-valore">${isTotTab ? 'CONFRONTO GLOBALE & VALORE' : 'CONTEGGIO ' + (warehouses[currentTab] || '').toUpperCase()}</th>
+          <th colspan="6" class="grp-valore">${isTotTab ? 'CONFRONTO GLOBALE & VALORE' : 'CONTEGGIO ' + (warehouses[currentTab] || '').toUpperCase()}</th>
         </tr>
         <tr>
           <th>Codice</th><th>Prodotto</th><th>U.M.</th>
@@ -630,6 +686,7 @@
           <th class="num">Atteso Totale</th>
           <th class="num">${isTotTab ? 'Totale Rilevato' : 'Locale'}</th>
           <th class="num">Globale</th>
+          <th class="num">Std Cost</th>
           <th class="num">Diff. Pezzi</th>
           <th class="num grp-valore">Diff. Valore (€)</th>
         </tr>
@@ -642,7 +699,7 @@
 
         let globalEffettivo = getGlobalProductTotals(r.code);
         let globalDiffPezzi = globalEffettivo - r.atteso;
-        let globalDiffValore = globalDiffPezzi * (r.unitPrice || 1);
+        let globalDiffValore = globalDiffPezzi * (r.stdCost || 0);
 
         let localEffettivo = 0;
         let cObj = null;
@@ -701,6 +758,7 @@
           <td class="num font-bold">${fmt(r.atteso)}</td>
           <td class="num cell-local font-bold">${isTotTab ? fmt(globalEffettivo) : fmt(localEffettivo)}</td>
           <td class="num cell-global font-bold">${fmt(globalEffettivo)}</td>
+          <td class="num">${fmtCurrency(r.stdCost || 0)}</td>
           <td class="num cell-diff ${globalDiffPezzi === 0 ? 'ok' : 'bad'}">${fmt(globalDiffPezzi)}</td>
           <td class="num cell-val ${globalDiffValore === 0 ? 'ok' : 'bad'}">${fmtCurrency(globalDiffValore)}</td>
         `;
@@ -729,7 +787,7 @@
             const locEff = (bSum * r.boxSize) + (slSum * r.sleeveSize) + sfSum;
             const globEff = getGlobalProductTotals(r.code);
             const globDiffP = globEff - r.atteso;
-            const globDiffV = globDiffP * (r.unitPrice || 1);
+            const globDiffV = globDiffP * (r.stdCost || 0);
 
             cellLocal.textContent = fmt(locEff);
             cellGlobal.textContent = fmt(globEff);
@@ -766,13 +824,13 @@
 
       const totData = [
         [`CINEMA / SEDE: ${cinemaName.toUpperCase()}`],
-        ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale Globale", "Differenza Pezzi", "Differenza Valore (€)"]
+        ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale Globale", "Std Cost (excl. Tax)", "Differenza Pezzi", "Differenza Valore (€)"]
       ];
 
       rows.forEach(r => {
         const globEff = getGlobalProductTotals(r.code);
         const globDiffP = globEff - r.atteso;
-        const globDiffV = globDiffP * (r.unitPrice || 1);
+        const globDiffV = globDiffP * (r.stdCost || 0);
 
         totData.push([
           r.code,
@@ -783,6 +841,7 @@
           r.venduto,
           r.atteso,
           globEff,
+          r.stdCost || 0,
           globDiffP,
           globDiffV
         ]);
@@ -817,7 +876,7 @@
           ]);
         });
 
-        const cleanSheetName = whName.replace(/[\/?*:[\]]/g, "").substring(0, 31) || `Magazzino ${idx + 1}`;
+        const cleanSheetName = whName.replace(/[\\/?*:[\]]/g, "").substring(0, 31) || `Magazzino ${idx + 1}`;
         const wsWh = XLSX.utils.aoa_to_sheet(whData);
         XLSX.utils.book_append_sheet(wb, wsWh, cleanSheetName);
       });
