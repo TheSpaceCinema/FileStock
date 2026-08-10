@@ -272,38 +272,43 @@ function parseMag(m) {
   const startRow = headerRow >= 0 ? headerRow + 1 : 10;
   const out = [];
 
-  for (let i = startRow; i < m.length; i++) {
+  let i = startRow;
+  while (i < m.length) {
     const r = m[i];
-    if (!r || !r.length) continue;
+    if (!r || !r.length) { i++; continue; }
 
-    // I dati sono in Colonna B (indice 1), non in Colonna A (indice 0)!
-    const cellCode = text(r[1] || r[0]);
-    const normCode = norm(cellCode);
+    const cellVal = text(r[1] || r[0]);
+    const normVal = norm(cellVal);
 
     // Salta intestazioni, totali, righe vuote e categorie
-    if (!cellCode || 
-        normCode.includes("STOCK LOCATION") || 
-        normCode.includes("STOCKTAKE") || 
-        normCode.includes("HISTORICAL") || 
-        normCode.includes("PLEASE TAKE") || 
-        normCode.includes("OPENING BALANCE") || 
-        normCode.includes("CLOSING BALANCE") || 
-        normCode.includes("TOTAL") || 
-        normCode.includes("CONCESSIONS STORE") ||
-        normCode.includes("PAGE ") ||
-        normCode === "FOOD" || normCode === "BEVERAGE" || normCode === "PACKAGING") {
+    if (!cellVal || 
+        normVal.includes("STOCK LOCATION") || 
+        normVal.includes("STOCKTAKE") || 
+        normVal.includes("HISTORICAL") || 
+        normVal.includes("PLEASE TAKE") || 
+        normVal.includes("OPENING BALANCE") || 
+        normVal.includes("CLOSING BALANCE") || 
+        normVal.includes("TOTAL") || 
+        normVal.includes("CONCESSIONS STORE") ||
+        normVal.includes("PAGE ") ||
+        normVal === "FOOD" || normVal === "BEVERAGE" || normVal === "PACKAGING") {
+      i++;
       continue;
     }
 
-    const rawCode = cellCode;
+    // Se troviamo la riga con i dati numerici (es. colonna UOM / colonna F valorizzate)
+    const rawCode = cellVal;
     const code = cleanCode(rawCode);
 
-    // Il NOME del prodotto risiede nella riga IMMEDIATAMENTE SOTTO (i+1) sempre in Colonna B (indice 1)
+    // Il NOME reale del prodotto è nella riga IMMEDIATAMENTE SOTTO (i+1)
     let name = "";
+    let consumedNextRow = false;
+
     if (i + 1 < m.length && m[i + 1]) {
       const nextCell = text(m[i + 1][1] || m[i + 1][0]);
       if (nextCell && !norm(nextCell).includes("TOTAL")) {
         name = nextCell;
+        consumedNextRow = true; // Segnamo che la riga i+1 è il nome di questo prodotto
       }
     }
 
@@ -311,13 +316,7 @@ function parseMag(m) {
       name = text(r[2]) || ("Prodotto " + code);
     }
 
-    // Mappatura esatta colonne del report Historical - Stock Variance:
-    // Colonna C (2)  -> UOM
-    // Colonna F (5)  -> Opening Balance
-    // Colonna O (14) -> Less Wastage
-    // Colonna S (18) -> Less Sales
-    // Colonna X (23) -> Closing Balance
-    // Colonna AD (29)-> Std Cost
+    // Mappatura colonne del report Stock Variance
     const uom = text(r[2] || "PZ");
     const iniziale = n(r[5]);
     const danni = n(r[14]);
@@ -341,6 +340,13 @@ function parseMag(m) {
       atteso,
       standardCost
     });
+
+    // Se abbiamo consumato la riga sottostante per il nome, saltiamo alla riga successiva (+2)
+    if (consumedNextRow) {
+      i += 2;
+    } else {
+      i++;
+    }
   }
 
   if (out.length === 0) {
