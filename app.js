@@ -64,6 +64,10 @@ function updateHeaderTitle() {
   $("appTitle").textContent = `📊 Gestione Inventario — ${cinemaName}`;
 }
 
+function showError(msg) {
+  alert(msg);
+}
+
 /* ---------------- SETUP & STORAGE ---------------- */
 function loadSetupFromStorage() {
   const savedCinema = localStorage.getItem("cinema_info_name");
@@ -253,7 +257,11 @@ function n(v) {
   const x = parseFloat(s.replace(/[^\d.-]/g, ""));
   return Number.isFinite(x) ? x : 0;
 }
+
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
+function esc(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function fmt(val) { return Number(val || 0).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function fmtMoney(val) { return Number(val || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 /* PARSER MAGAZZINO */
 function parseMag(m) {
@@ -646,175 +654,119 @@ function renderMultiInput(whIdx, code, type, sizeVal) {
   const disabledAttr = isDisabled ? 'disabled style="background-color: #e9ecef !important; color: #adb5bd !important; cursor: not-allowed;"' : '';
 
   let html = `<div class="input-scroll-cell" id="container-${code}-${type}">`;
-
   arr.forEach((val, idx) => {
-    html += `<input class="qty-input" type="number" step="any" min="0" value="${val || ''}" ${disabledAttr}
-             onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)"
-             onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
+    html += `<input type="number" step="any" min="0" class="qty-input" value="${val ? val : ''}" ${disabledAttr} oninput="handleInput(${whIdx}, '${code}', '${type}', ${idx}, this.value)">`;
   });
 
-  if (!isDisabled && arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
-    html += `<input class="qty-input" type="number" step="any" min="0" value="" placeholder="+" 
-             onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)"
-             onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)">`;
+  if (!isDisabled && arr.length < MAX_FIELDS) {
+    html += `<button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 0.8rem;" onclick="addInputField(${whIdx}, '${code}', '${type}')">＋</button>`;
   }
-
   html += `</div>`;
   return html;
 }
 
-function updateCountValue(whIdx, code, type, idx, inputEl) {
+function handleInput(whIdx, code, type, index, val) {
   const c = getCount(whIdx, code);
-  const val = inputEl.value;
-  c[type][idx] = n(val);
+  c[type][index] = n(val);
+  saveCountsToStorage();
 
   const r = rows.find(x => x.code === code);
-  if (!r) return;
+  if (r) {
+    const newEff = getGlobalRilevato(code, r);
+    const newDiff = newEff - r.atteso;
+    const newDiffVal = newDiff * (r.standardCost || 0);
 
-  const container = $(`container-${code}-${type}`);
-  if (container && idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
-    const newInput = document.createElement("input");
-    newInput.className = "qty-input";
-    newInput.type = "number";
-    newInput.step = "any";
-    newInput.min = "0";
-    newInput.value = "";
-    newInput.placeholder = "+";
-    newInput.onkeyup = function() { updateCountValue(whIdx, code, type, c[type].length, this); };
-    newInput.onchange = function() { updateCountValue(whIdx, code, type, c[type].length, this); };
-    container.appendChild(newInput);
+    const effEl = $(`eff-${code}`);
+    if (effEl) effEl.textContent = fmt(newEff);
+
+    const diffEl = $(`diff-${code}`);
+    if (diffEl) {
+      diffEl.textContent = fmt(newDiff);
+      diffEl.className = `num cell-diff ${newDiff === 0 ? 'ok' : 'bad'}`;
+    }
+
+    const valEl = $(`val-${code}`);
+    if (valEl) {
+      valEl.textContent = `€ ${fmtMoney(newDiffVal)}`;
+      valEl.className = `num grp-valore cell-val ${newDiffVal >= 0 ? 'ok' : 'bad'}`;
+    }
   }
 
-  const effettivoGlobale = getGlobalRilevato(code, r);
-  const diffTotale = effettivoGlobale - r.atteso;
-  const diffValore = diffTotale * (r.standardCost || 0);
-
-  const effEl = $(`eff-${code}`);
-  const diffEl = $(`diff-${code}`);
-  const valEl = $(`val-${code}`);
-
-  if (effEl) effEl.textContent = fmt(effettivoGlobale);
-  if (diffEl) {
-    diffEl.textContent = fmt(diffTotale);
-    diffEl.className = `num cell-diff ${diffTotale === 0 ? 'ok' : 'bad'}`;
-  }
-  if (valEl) {
-    valEl.textContent = "€ " + fmtMoney(diffValore);
-    valEl.className = `num grp-valore cell-val ${diffValore >= 0 ? 'ok' : 'bad'}`;
-  }
-
-  saveCountsToStorage();
   recalcKPIs();
 }
 
-function recalcKPIs() {
-  let totalAttesoPezzi = 0;
-  let totalRilevatoPezzi = 0;
-  let totalDiffPezzi = 0;
-  let totalDiffValore = 0;
-
-  rows.forEach(r => {
-    const eff = getGlobalRilevato(r.code, r);
-    const diff = eff - r.atteso;
-    const val = diff * (r.standardCost || 0);
-
-    totalAttesoPezzi += r.atteso;
-    totalRilevatoPezzi += eff;
-    totalDiffPezzi += diff;
-    totalDiffValore += val;
-  });
-
-  $("kpiAtteso").textContent = fmt(totalAttesoPezzi);
-  $("kpiRilevato").textContent = fmt(totalRilevatoPezzi);
-  $("kpiDiffPezzi").textContent = fmt(totalDiffPezzi);
-  $("kpiDiffValore").textContent = "€ " + fmtMoney(totalDiffValore);
-
-  $("kpiDiffBox").className = "kpi-card " + (totalDiffPezzi === 0 ? "success" : "warning");
-  $("kpiValoreBox").className = "kpi-card " + (totalDiffValore >= 0 ? "success" : "warning");
+function addInputField(whIdx, code, type) {
+  const c = getCount(whIdx, code);
+  if (c[type].length < MAX_FIELDS) {
+    c[type].push(0);
+    saveCountsToStorage();
+    render();
+  }
 }
 
-/* ---------------- ESPORTAZIONE EXCEL ---------------- */
-function exportToExcel() {
-  if (!rows || rows.length === 0) {
-    alert("Nessun dato da esportare. Carica prima i file di magazzino.");
-    return;
-  }
-
-  if (typeof XLSX === "undefined") {
-    alert("Libreria XLSX non presente.");
-    return;
-  }
-
-  const wb = XLSX.utils.book_new();
-
-  const totData = [
-    [`CINEMA / SEDE: ${cinemaName.toUpperCase()}`],
-    ["Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale", "Differenza Pezzi", "Costo Standard", "Differenza Valore (€)"]
-  ];
+function recalcKPIs() {
+  let totAtteso = 0;
+  let totRilevato = 0;
+  let totDiffValore = 0;
 
   rows.forEach(r => {
-    const effettivoTot = getGlobalRilevato(r.code, r);
-    const diffTot = effettivoTot - r.atteso;
-    const diffVal = diffTot * (r.standardCost || 0);
+    totAtteso += r.atteso;
+    const eff = getGlobalRilevato(r.code, r);
+    totRilevato += eff;
+    totDiffValore += (eff - r.atteso) * (r.standardCost || 0);
+  });
 
-    totData.push([
+  const diffPezzi = totRilevato - totAtteso;
+
+  $("kpiAtteso").textContent = fmt(totAtteso);
+  $("kpiRilevato").textContent = fmt(totRilevato);
+  $("kpiDiffPezzi").textContent = fmt(diffPezzi);
+  $("kpiDiffValore").textContent = `€ ${fmtMoney(totDiffValore)}`;
+
+  const diffBox = $("kpiDiffBox");
+  if (diffBox) {
+    diffBox.className = `kpi-card ${diffPezzi === 0 ? 'success' : 'warning'}`;
+  }
+  const valBox = $("kpiValoreBox");
+  if (valBox) {
+    valBox.className = `kpi-card ${totDiffValore >= 0 ? 'success' : 'warning'}`;
+  }
+}
+
+/* ---------------- EXPORT EXCEL ---------------- */
+function exportToExcel() {
+  if (!rows.length) { alert("Nessun dato da esportare."); return; }
+
+  const exportData = [];
+  exportData.push([
+    "CODICE", "PRODOTTO", "U.M.", "INIZIALE", "DANNI", "VENDUTO", "ATTESO", 
+    "RILEVATO GLOBALE", "DIFFERENZA PEZZI", "COSTO UNIT.", "DIFFERENZA VALORE"
+  ]);
+
+  rows.forEach(r => {
+    const rilevato = getGlobalRilevato(r.code, r);
+    const diff = rilevato - r.atteso;
+    const diffVal = diff * (r.standardCost || 0);
+
+    exportData.push([
+      r.code,
       r.name,
       r.uom,
       r.iniziale,
       r.danni,
       r.venduto,
       r.atteso,
-      effettivoTot,
-      diffTot,
+      rilevato,
+      diff,
       r.standardCost || 0,
       diffVal
     ]);
   });
 
-  const wsTot = XLSX.utils.aoa_to_sheet(totData);
-  XLSX.utils.book_append_sheet(wb, wsTot, "Riepilogo Totale");
-
-  warehouses.forEach((whName, idx) => {
-    const whData = [
-      [`MAGAZZINO: ${whName.toUpperCase()} — SEDE: ${cinemaName.toUpperCase()}`],
-      ["Prodotto", "U.M.", "Box Size", "Q.tà Box (Tot)", "Sleeve Size", "Q.tà Sleeve (Tot)", "Q.tà Sfuso (Tot)", "Totale Rilevato (Pezzi)"]
-    ];
-
-    rows.forEach(r => {
-      const c = getCount(idx, r.code);
-      const bSum = sumArr(c.box);
-      const sSum = sumArr(c.sleeve);
-      const sfSum = sumArr(c.sfuso);
-      const effettivoWh = (bSum * r.boxSize) + (sSum * r.sleeveSize) + sfSum;
-
-      whData.push([
-        r.name,
-        r.uom,
-        r.boxSize || 0,
-        bSum,
-        r.sleeveSize || 0,
-        sSum,
-        sfSum,
-        effettivoWh
-      ]);
-    });
-
-    const cleanSheetName = whName.replace(/[\\/?*:[\]]/g, "").substring(0, 31) || `Magazzino ${idx + 1}`;
-    const wsWh = XLSX.utils.aoa_to_sheet(whData);
-    XLSX.utils.book_append_sheet(wb, wsWh, cleanSheetName);
-  });
-
-  const today = new Date().toISOString().split('T')[0];
-  const cleanCinemaName = cinemaName.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const fileName = `Inventario_${cleanCinemaName}_${today}.xlsx`;
-
-  XLSX.writeFile(wb, fileName);
-}
-
-function fmt(v) { return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3))); }
-function fmtMoney(v) { return (Number(v) || 0).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function esc(v) { return text(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c])); }
-function showError(msg) { 
-  $("mainStatus").style.display = "block";
-  $("mainStatus").innerHTML = `<span style="color:#b00020;font-weight:bold">${esc(msg)}</span>`; 
+  const ws = XLSX.utils.aoa_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Inventario Totale");
+  
+  const safeName = cinemaName.replace(/[^a-zA-Z0-9]/g, "_");
+  XLSX.writeFile(wb, `Inventario_${safeName}.xlsx`);
 }
