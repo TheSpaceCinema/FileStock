@@ -1,8 +1,9 @@
 let mag = [], size = [], rows = [];
 let cinemaName = "TSC Beinasco";
-let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
+let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn", "Magazzino Caramelle"]; 
 let currentTab = 0; 
 let countsData = {}; 
+let caramelleData = {}; // Memorizza i dati specifici della griglia caramelle per magazzino/sede
 
 const MAX_FIELDS = 10;
 
@@ -22,6 +23,7 @@ const $ = id => document.getElementById(id);
 document.addEventListener("DOMContentLoaded", () => {
   loadSetupFromStorage();
   loadCountsFromStorage();
+  loadCaramelleFromStorage();
   updateHeaderTitle();
 
   $("magFile").addEventListener("change", e => {
@@ -85,10 +87,23 @@ function saveCountsToStorage() {
   localStorage.setItem("inventory_counts", JSON.stringify(countsData));
 }
 
+function loadCaramelleFromStorage() {
+  const savedCaramelle = localStorage.getItem("caramelle_grid_data");
+  if (savedCaramelle) {
+    try { caramelleData = JSON.parse(savedCaramelle); } catch(e){}
+  }
+}
+
+function saveCaramelleToStorage() {
+  localStorage.setItem("caramelle_grid_data", JSON.stringify(caramelleData));
+}
+
 function resetCounts() {
   if (confirm("Sei sicuro di voler azzerare tutti i conteggi inseriti per tutti i magazzini?")) {
     countsData = {};
+    caramelleData = {};
     saveCountsToStorage();
+    saveCaramelleToStorage();
     render();
   }
 }
@@ -188,7 +203,8 @@ function renderTabs() {
   warehouses.forEach((w, idx) => {
     const btn = document.createElement("button");
     btn.className = `tab-btn ${currentTab === idx ? 'active' : ''}`;
-    btn.textContent = `📍 ${w}`;
+    const isCaramelleWh = norm(w).includes("CARAMELLE");
+    btn.textContent = isCaramelleWh ? `🍬 ${w}` : `📍 ${w}`;
     btn.onclick = () => { currentTab = idx; switchTab(); };
     bar.appendChild(btn);
   });
@@ -470,6 +486,16 @@ function build() {
 
 /* ---------------- DATA CALCULATIONS ---------------- */
 function getCount(whIdx, code) {
+  // Se è il magazzino caramelle ed il prodotto è "Caramelle Aermont" (o simile in kg)
+  const whName = warehouses[whIdx] || "";
+  if (norm(whName).includes("CARAMELLE")) {
+    const r = rows.find(x => x.code === code);
+    if (r && (norm(r.name).includes("CARAMELLE AERMONT") || r.uom === "KG")) {
+      const totalKg = getCaramelleTotalKg(whIdx);
+      return { box: [0], sleeve: [0], sfuso: [totalKg] };
+    }
+  }
+
   if (!countsData[whIdx]) countsData[whIdx] = {};
   if (!countsData[whIdx][code]) countsData[whIdx][code] = { box: [0], sleeve: [0], sfuso: [0] };
   
@@ -482,6 +508,38 @@ function getCount(whIdx, code) {
 }
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
+
+function getCaramelleTotalKg(whIdx) {
+  const key = `${cinemaName}_${whIdx}`;
+  const data = caramelleData[key];
+  if (!data) return 0;
+
+  let totalNetto = 0;
+  // Calcolo griglia sfusi (Lordo - Tara)
+  if (data.grid && Array.isArray(data.grid)) {
+    data.grid.forEach(row => {
+      if (row && Array.isArray(row)) {
+        row.forEach(cell => {
+          const lordo = n(cell);
+          if (lordo > 0) {
+            const tareVal = n(data.tare || 0.37);
+            const netto = Math.max(0, lordo - tareVal);
+            totalNetto += netto;
+          }
+        });
+      }
+    });
+  }
+
+  // Calcolo caramelle in busta
+  if (data.buste && Array.isArray(data.buste)) {
+    data.buste.forEach(b => {
+      totalNetto += n(b);
+    });
+  }
+
+  return totalNetto;
+}
 
 function getKitContributionDetail(productName, productCode) {
   let kitContribution = 0;
@@ -531,15 +589,36 @@ function getGlobalRilevato(code, r) {
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
 
-/* ---------------- TABLE RENDER ---------------- */
+/* ---------------- TABLE RENDER & CARAMELLE VIEW ---------------- */
 function render() {
   if (currentTab === 'setup') return;
 
+  const isTotTab = (currentTab === 'tot');
+  const whName = isTotTab ? "" : (warehouses[currentTab] || "");
+  const isCaramelleTab = !isTotTab && norm(whName).includes("CARAMELLE");
+
+  if (isCaramelleTab) {
+    renderCaramelleView(currentTab);
+    return;
+  }
+
+  // Vista standard tabella inventario
   const q = norm($("search").value);
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   $("count").textContent = `${data.length} prodotti`;
 
-  const isTotTab = (currentTab === 'tot');
+  // Ripristina la struttura HTML della tabella se era stata sovrascritta dalla vista caramelle
+  const tableContainer = $("tableContainerWrapper") || $("tabContent");
+  if (!document.getElementById("thead")) {
+    tableContainer.innerHTML = `
+      <div class="table-responsive">
+        <table class="inventory-table">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    `;
+  }
 
   $("thead").innerHTML = `
     <tr style="position: sticky; top: 0; z-index: 20; background: #212529;">
@@ -632,6 +711,207 @@ function render() {
   });
 
   recalcKPIs();
+}
+
+/* ---------------- GESTIONE MAGAZZINO CARAMELLE (GRIGLIA DINAMICA & TARE) ---------------- */
+function renderCaramelleView(whIdx) {
+  const whName = warehouses[whIdx];
+  const key = `${cinemaName}_${whIdx}`;
+  if (!caramelleData[key]) {
+    caramelleData[key] = {
+      rowsCount: 4,
+      colsCount: 4,
+      tare: 0.37,
+      grid: Array(4).fill().map(() => Array(4).fill(0)),
+      buste: [0]
+    };
+  }
+  const data = caramelleData[key];
+
+  $("count").textContent = `Magazzino Caramelle (${whName})`;
+
+  const totalKg = getCaramelleTotalKg(whIdx);
+
+  let html = `
+    <div class="caramelle-wrapper" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+      <h3 style="margin-top: 0; color: #333; display: flex; align-items: center; gap: 10px;">
+        🍬 Gestione Avanzata Pesi Caramelle — ${esc(whName)}
+      </h3>
+      <p style="color: #666; font-size: 14px;">Inserisci i pesi lordi dei contenitori sfusi. Il sistema sottrarrà automaticamente la tara selezionata e sommerà le caramelle in busta per determinare il totale in kg da sincronizzare con l'inventario.</p>
+      
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+        <div>
+          <label style="display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px;">Tara Contenitori:</label>
+          <select id="caramelleTareSelect" onchange="updateCaramelleTare(event, ${whIdx})" style="padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc;">
+            <option value="0.37" ${data.tare == 0.37 ? 'selected' : ''}>0.37 kg (Standard)</option>
+            <option value="0.72" ${data.tare == 0.72 ? 'selected' : ''}>0.72 kg (Grande)</option>
+            <option value="custom" ${data.tare !== 0.37 && data.tare !== 0.72 ? 'selected' : ''}>Personalizzata</option>
+          </select>
+          <input type="number" step="0.01" id="caramelleCustomTareInput" value="${data.tare}" onchange="updateCaramelleCustomTare(${whIdx}, this)" style="width: 80px; padding: 6px; margin-left: 8px; border-radius: 4px; border: 1px solid #ccc; display: ${data.tare !== 0.37 && data.tare !== 0.72 ? 'inline-block' : 'none'};">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px;">Righe Griglia:</label>
+          <input type="number" min="1" max="20" value="${data.rowsCount}" onchange="updateCaramelleGridSize(${whIdx}, this.value, ${data.colsCount})" style="width: 70px; padding: 6px; border-radius: 4px; border: 1px solid #ccc;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px;">Colonne Griglia:</label>
+          <input type="number" min="1" max="10" value="${data.colsCount}" onchange="updateCaramelleGridSize(${whIdx}, ${data.rowsCount}, this.value)" style="width: 70px; padding: 6px; border-radius: 4px; border: 1px solid #ccc;">
+        </div>
+
+        <div style="margin-left: auto; background: #e3f2fd; padding: 10px 15px; border-radius: 6px; border: 1px solid #90caf9;">
+          <span style="font-size: 13px; color: #0d47a1; font-weight: bold;">TOTALE CALCOLATO CARAMELLE:</span>
+          <div style="font-size: 20px; color: #0d47a1; font-weight: bold; text-align: right;">${fmt(totalKg)} kg</div>
+        </div>
+      </div>
+
+      <h4 style="margin-bottom: 10px; color: #444;">1. Pesi Lordi Contenitori Sfusi (kg)</h4>
+      <div style="overflow-x: auto; margin-bottom: 25px;">
+        <table style="border-collapse: collapse; width: 100%;">
+  `;
+
+  // Costruzione griglia dinamica
+  for (let r = 0; r < data.rowsCount; r++) {
+    html += `<tr>`;
+    for (let c = 0; c < data.colsCount; c++) {
+      if (!data.grid[r]) data.grid[r] = [];
+      const val = data.grid[r][c] || "";
+      html += `
+        <td style="padding: 4px; border: 1px solid #dee2e6; text-align: center; background: #fff;">
+          <div style="font-size: 10px; color: #888; margin-bottom: 2px;">R${r+1} C${c+1}</div>
+          <input type="number" step="any" min="0" value="${val}" 
+                 oninput="updateCaramelleCell(${whIdx}, ${r}, ${c}, this.value)"
+                 style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
+        </td>
+      `;
+    }
+    html += `</tr>`;
+  }
+
+  html += `
+        </table>
+      </div>
+
+      <h4 style="margin-bottom: 10px; color: #444;">2. Caramelle in Busta (Pesi netti o quantità in kg)</h4>
+      <div id="caramelleBusteContainer" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+  `;
+
+  if (!data.buste || !Array.isArray(data.buste)) data.buste = [0];
+  data.buste.forEach((bVal, bIdx) => {
+    html += `
+      <div style="display: flex; align-items: center; gap: 5px; background: #f1f3f5; padding: 6px 10px; border-radius: 4px;">
+        <span style="font-size: 12px; font-weight: bold; color: #555;">Busta ${bIdx + 1}:</span>
+        <input type="number" step="any" min="0" value="${bVal || ''}" 
+               oninput="updateCaramelleBusta(${whIdx}, ${bIdx}, this.value)"
+               style="width: 80px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+        <button onclick="removeCaramelleBusta(${whIdx}, ${bIdx})" style="background: #d32f2f; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">×</button>
+      </div>
+    `;
+  });
+
+  if (data.buste.length < 20 && data.buste[data.buste.length - 1] > 0) {
+    data.buste.push(0);
+  }
+
+  html += `
+      </div>
+      <button onclick="addCaramelleBusta(${whIdx})" style="background: #1976d2; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 13px;">➕ Aggiungi Busta</button>
+    </div>
+  `;
+
+  // Inietta nel contenitore principale
+  const container = $("tableContainerWrapper") || $("tabContent");
+  container.innerHTML = html;
+
+  recalcKPIs();
+}
+
+function updateCaramelleTare(e, whIdx) {
+  const key = `${cinemaName}_${whIdx}`;
+  const selVal = e.target.value;
+  const customInput = $("caramelleCustomTareInput");
+
+  if (selVal === "custom") {
+    customInput.style.display = "inline-block";
+  } else {
+    customInput.style.display = "none";
+    caramelleData[key].tare = parseFloat(selVal);
+    saveCaramelleToStorage();
+    renderCaramelleView(whIdx);
+  }
+}
+
+function updateCaramelleCustomTare(whIdx, inputEl) {
+  const key = `${cinemaName}_${whIdx}`;
+  caramelleData[key].tare = n(inputEl.value);
+  saveCaramelleToStorage();
+  renderCaramelleView(whIdx);
+}
+
+function updateCaramelleGridSize(whIdx, rowsCount, colsCount) {
+  const key = `${cinemaName}_${whIdx}`;
+  const rNum = parseInt(rowsCount, 10) || 1;
+  const cNum = parseInt(colsCount, 10) || 1;
+
+  caramelleData[key].rowsCount = rNum;
+  caramelleData[key].colsCount = cNum;
+
+  // Ridimensiona o preserva la matrice esistente
+  const oldGrid = caramelleData[key].grid || [];
+  const newGrid = [];
+  for (let r = 0; r < rNum; r++) {
+    newGrid[r] = [];
+    for (let c = 0; c < cNum; c++) {
+      newGrid[r][c] = (oldGrid[r] && oldGrid[r][c] !== undefined) ? oldGrid[r][c] : 0;
+    }
+  }
+  caramelleData[key].grid = newGrid;
+  saveCaramelleToStorage();
+  renderCaramelleView(whIdx);
+}
+
+function updateCaramelleCell(whIdx, r, c, val) {
+  const key = `${cinemaName}_${whIdx}`;
+  if (!caramelleData[key].grid[r]) caramelleData[key].grid[r] = [];
+  caramelleData[key].grid[r][c] = n(val);
+  saveCaramelleToStorage();
+  
+  // Aggiorna KPI in tempo reale senza perdere il focus
+  recalcKPIs();
+}
+
+function updateCaramelleBusta(whIdx, bIdx, val) {
+  const key = `${cinemaName}_${whIdx}`;
+  if (!caramelleData[key].buste) caramelleData[key].buste = [];
+  caramelleData[key].buste[bIdx] = n(val);
+
+  // Aggiunge automaticamente un nuovo input se l'ultimo è valorizzato
+  if (bIdx === caramelleData[key].buste.length - 1 && n(val) > 0 && caramelleData[key].buste.length < 20) {
+    caramelleData[key].buste.push(0);
+    renderCaramelleView(whIdx);
+    return;
+  }
+  saveCaramelleToStorage();
+  recalcKPIs();
+}
+
+function addCaramelleBusta(whIdx) {
+  const key = `${cinemaName}_${whIdx}`;
+  if (!caramelleData[key].buste) caramelleData[key].buste = [];
+  caramelleData[key].buste.push(0);
+  saveCaramelleToStorage();
+  renderCaramelleView(whIdx);
+}
+
+function removeCaramelleBusta(whIdx, bIdx) {
+  const key = `${cinemaName}_${whIdx}`;
+  if (caramelleData[key].buste) {
+    caramelleData[key].buste.splice(bIdx, 1);
+    if (caramelleData[key].buste.length === 0) caramelleData[key].buste.push(0);
+    saveCaramelleToStorage();
+    renderCaramelleView(whIdx);
+  }
 }
 
 function renderMultiInput(whIdx, code, type, sizeVal) {
@@ -775,28 +1055,38 @@ function exportToExcel() {
   XLSX.utils.book_append_sheet(wb, wsTot, "Riepilogo Totale");
 
   warehouses.forEach((whName, idx) => {
+    const isCaramelleWh = norm(whName).includes("CARAMELLE");
     const whData = [
       [`MAGAZZINO: ${whName.toUpperCase()} — SEDE: ${cinemaName.toUpperCase()}`],
-      ["Prodotto", "U.M.", "Box Size", "Q.tà Box (Tot)", "Sleeve Size", "Q.tà Sleeve (Tot)", "Q.tà Sfuso (Tot)", "Totale Rilevato (Pezzi)"]
+      isCaramelleWh 
+        ? ["Prodotto", "U.M.", "Totale Rilevato (kg)"] 
+        : ["Prodotto", "U.M.", "Box Size", "Q.tà Box (Tot)", "Sleeve Size", "Q.tà Sleeve (Tot)", "Q.tà Sfuso (Tot)", "Totale Rilevato (Pezzi)"]
     ];
 
     rows.forEach(r => {
       const c = getCount(idx, r.code);
-      const bSum = sumArr(c.box);
-      const sSum = sumArr(c.sleeve);
-      const sfSum = sumArr(c.sfuso);
-      const effettivoWh = (bSum * r.boxSize) + (sSum * r.sleeveSize) + sfSum;
+      if (isCaramelleWh) {
+        const sfSum = sumArr(c.sfuso);
+        if (sfSum > 0 || norm(r.name).includes("CARAMELLE") || r.uom === "KG") {
+          whData.push([r.name, r.uom, sfSum]);
+        }
+      } else {
+        const bSum = sumArr(c.box);
+        const sSum = sumArr(c.sleeve);
+        const sfSum = sumArr(c.sfuso);
+        const effettivoWh = (bSum * r.boxSize) + (sSum * r.sleeveSize) + sfSum;
 
-      whData.push([
-        r.name,
-        r.uom,
-        r.boxSize || 0,
-        bSum,
-        r.sleeveSize || 0,
-        sSum,
-        sfSum,
-        effettivoWh
-      ]);
+        whData.push([
+          r.name,
+          r.uom,
+          r.boxSize || 0,
+          bSum,
+          r.sleeveSize || 0,
+          sSum,
+          sfSum,
+          effettivoWh
+        ]);
+      }
     });
 
     const cleanSheetName = whName.replace(/[\\/?*:[\]]/g, "").substring(0, 31) || `Magazzino ${idx + 1}`;
