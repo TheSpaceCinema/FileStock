@@ -471,8 +471,7 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
-/* CALCOLO GLOBALE CON SCOMPOSIZIONE KIT SUI COMPONENTI */
-/* FUNZIONE PER CALCOLO E ESTRAZIONE DEL CONTRIBUTO DEI KIT */
+/* CONTRIBUTO KIT FLESSIBILE */
 function getKitContributionDetail(productName, productCode) {
   let kitContribution = 0;
   const normProdName = norm(productName);
@@ -483,7 +482,6 @@ function getKitContributionDetail(productName, productCode) {
       rowItem.ingredients.forEach(ing => {
         const normIngName = norm(ing.name);
         
-        // Matching flessibile tra ingrediente del kit e prodotto di magazzino
         if (normProdName.includes(normIngName) || normIngName.includes(normProdName) || (productCode && normProdCode === norm(ing.code))) {
           warehouses.forEach((_, wIdx) => {
             const kitCounts = getCount(wIdx, rowItem.code);
@@ -532,7 +530,7 @@ function render() {
       <th colspan="2" class="grp-box">BOX</th>
       <th colspan="2" class="grp-sleeve">SLEEVE</th>
       <th class="grp-sfuso">SFUSO</th>
-      <th colspan="3">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
+      <th colspan="5">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
       <th colspan="2" class="grp-valore">VALORIZZAZIONE</th>
     </tr>
     <tr>
@@ -541,7 +539,7 @@ function render() {
       <th class="num grp-box">Size</th><th class="grp-box">Q.tà Box</th>
       <th class="num grp-sleeve">Size</th><th class="grp-sleeve">Q.tà Sleeve</th>
       <th class="grp-sfuso">Q.tà Sfuso</th>
-      <th class="num">Atteso</th><th class="num">Effettivo Globale</th><th class="num">Diff. Totale</th>
+      <th class="num">Atteso</th><th class="num">Rilevato Base</th><th class="num" style="background:#e3f2fd; color:#0d47a1;">➕ Da Kit</th><th class="num">Effettivo Totale</th><th class="num">Diff. Totale</th>
       <th class="num grp-valore">Costo Unit.</th><th class="num grp-valore">Diff. Valore</th>
     </tr>
   `;
@@ -556,13 +554,26 @@ function render() {
       tr.style.borderLeft = "4px solid #1976d2";
     }
 
-    const c = getCount(currentTab, r.code);
-    const boxLocal = sumArr(c.box);
-    const sleeveLocal = sumArr(c.sleeve);
-    const sfusoLocal = sumArr(c.sfuso);
+    let totBoxLocal = 0, totSleeveLocal = 0, totSfusoLocal = 0;
+    if (isTotTab) {
+      warehouses.forEach((_, wIdx) => {
+        const cWh = getCount(wIdx, r.code);
+        totBoxLocal += sumArr(cWh.box);
+        totSleeveLocal += sumArr(cWh.sleeve);
+        totSfusoLocal += sumArr(cWh.sfuso);
+      });
+    } else {
+      const c = getCount(currentTab, r.code);
+      totBoxLocal = sumArr(c.box);
+      totSleeveLocal = sumArr(c.sleeve);
+      totSfusoLocal = sumArr(c.sfuso);
+    }
 
-    const effettivoGlobale = getGlobalRilevato(r.code, r);
-    const diffTotale = effettivoGlobale - r.atteso;
+    const baseRilevato = (totBoxLocal * r.boxSize) + (totSleeveLocal * r.sleeveSize) + totSfusoLocal;
+    const kitPart = getKitContributionDetail(r.name, r.code);
+    
+    const effettivoTotaleComplesso = getGlobalRilevato(r.code, r);
+    const diffTotale = effettivoTotaleComplesso - r.atteso;
     const diffValore = diffTotale * (r.standardCost || 0);
 
     tr.innerHTML = `
@@ -573,15 +584,17 @@ function render() {
       <td class="num">${fmt(r.venduto)}</td>
       
       <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
-      <td class="grp-box">${isTotTab ? fmt(boxLocal) : renderMultiInput(currentTab, r.code, 'box')}</td>
+      <td class="grp-box">${isTotTab ? fmt(totBoxLocal) : renderMultiInput(currentTab, r.code, 'box')}</td>
       
       <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
-      <td class="grp-sleeve">${isTotTab ? fmt(sleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve')}</td>
+      <td class="grp-sleeve">${isTotTab ? fmt(totSleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve')}</td>
       
-      <td class="num grp-sfuso">${isTotTab ? fmt(sfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
+      <td class="num grp-sfuso">${isTotTab ? fmt(totSfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
       
       <td class="num">${fmt(r.atteso)}</td>
-      <td class="num cell-eff" id="eff-${r.code}">${fmt(effettivoGlobale)}</td>
+      <td class="num">${fmt(baseRilevato)}</td>
+      <td class="num" style="background:#f0f4f8; font-weight:bold; color:#1976d2;">${fmt(kitPart)}</td>
+      <td class="num cell-eff" id="eff-${r.code}">${fmt(effettivoTotaleComplesso)}</td>
       <td class="num cell-diff ${diffTotale === 0 ? 'ok' : 'bad'}" id="diff-${r.code}">${fmt(diffTotale)}</td>
       <td class="num grp-valore">€ ${fmtMoney(r.standardCost || 0)}</td>
       <td class="num grp-valore cell-val ${diffValore >= 0 ? 'ok' : 'bad'}" id="val-${r.code}">€ ${fmtMoney(diffValore)}</td>
