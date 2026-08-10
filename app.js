@@ -1,40 +1,73 @@
 /* ==========================================================================
-   GESTIONE INVENTARIO WEB APP — APP.JS (Correzione Definitiva Globale)
+   GESTIONE INVENTARIO WEB APP — APP.JS (Corretto e Definitivo)
    ========================================================================== */
 
-// 1. Dichiariamo subito le funzioni globali richiamate dall'HTML nei pulsanti in alto
-function renderSetupView() {
-  if (typeof openConfigModal === 'function') {
-    openConfigModal();
-  } else {
-    alert("Pannello di configurazione Cinema e Magazzini attivo.");
-  }
-}
-
-function toggleFilesSection() {
-  if (typeof renderUploadScreen === 'function') {
-    renderUploadScreen();
-  } else {
-    console.error("renderUploadScreen non definita");
-  }
-}
-
-// Variabili di stato globali
 let cinemaName = "TSC Nola";
 let warehouses = ["Magazzino 1 piano", "Retroconc", "Magazzinetti retroconc", "Concession", "Magazzino Caramelle"];
-let rows = []; 
-let counts = {}; 
-let caramelleData = {}; 
+let rows = []; // Dati prodotti dal file Excel
+let counts = {}; // Struttura: counts[whIdx][code] = { box: [..], sleeve: [..], sfuso: [..] }
+let caramelleData = {}; // Struttura caramelle: caramelleData[key] = [ { qta: 1, peso: 0, tara: 0 }, ... ]
 
 const MAX_FIELDS = 50;
 
-// Inizializzazione all'avvio della pagina
+// Inizializzazione all'avvio
 document.addEventListener("DOMContentLoaded", () => {
   loadFromStorage();
   ensureMagazzinoCaramelle();
+  initTopButtons();
   initTabs();
   render();
 });
+
+// Funzioni richiamate direttamente dall'HTML (pulsanti in alto)
+window.renderSetupView = function() {
+  openConfigModal();
+};
+
+window.toggleFilesSection = function() {
+  renderUploadScreen();
+};
+
+// Collega i pulsanti in alto se usano selettori dinamici o attributi inline
+function initTopButtons() {
+  const buttons = document.querySelectorAll("header button, .top-bar button, button");
+  buttons.forEach(btn => {
+    const text = btn.textContent || "";
+    if (text.includes("Configura")) {
+      btn.onclick = () => openConfigModal();
+    } else if (text.includes("Carica") || text.includes("File")) {
+      btn.onclick = () => toggleUploadSection();
+    }
+  });
+}
+
+function toggleUploadSection() {
+  renderUploadScreen();
+}
+
+function renderUploadScreen() {
+  const container = document.getElementById("mainTableContainer");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); max-width:800px; margin: 20px auto;">
+      <h3>📁 Caricamento File Excel</h3>
+      <p style="color:#666; font-size:13px; margin-bottom:20px;">Carica il report di magazzino e l'anagrafica SIZE per popolare i dati.</p>
+      
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
+        <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
+          <h4>1. Report Magazzino</h4>
+          <input type="file" id="fileReport" accept=".xlsx, .xls" onchange="handleReportUpload(event)" style="margin-top:10px;">
+        </div>
+        <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
+          <h4>2. Anagrafica SIZE</h4>
+          <input type="file" id="fileSize" accept=".xlsx, .xls" onchange="handleSizeUpload(event)" style="margin-top:10px;">
+        </div>
+      </div>
+      <button onclick="render()" style="background:#333; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Torna all'Inventario</button>
+    </div>
+  `;
+}
 
 function ensureMagazzinoCaramelle() {
   if (!warehouses.some(w => w.toLowerCase().includes("caramelle"))) {
@@ -246,30 +279,6 @@ function render() {
       renderStandardWarehouseView(container, currentActiveWhIdx);
     }
   }
-}
-
-function renderUploadScreen() {
-  const container = document.getElementById("mainTableContainer");
-  if (!container) return;
-
-  container.innerHTML = `
-    <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); max-width:800px; margin: 20px auto;">
-      <h3>📁 Caricamento File Excel</h3>
-      <p style="color:#666; font-size:13px; margin-bottom:20px;">Carica il report di magazzino e l'anagrafica SIZE per popolare i dati.</p>
-      
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
-        <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
-          <h4>1. Report Magazzino</h4>
-          <input type="file" id="fileReport" accept=".xlsx, .xls" onchange="handleReportUpload(event)" style="margin-top:10px;">
-        </div>
-        <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
-          <h4>2. Anagrafica SIZE</h4>
-          <input type="file" id="fileSize" accept=".xlsx, .xls" onchange="handleSizeUpload(event)" style="margin-top:10px;">
-        </div>
-      </div>
-      <button onclick="render()" style="background:#333; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Torna all'Inventario</button>
-    </div>
-  `;
 }
 
 /* ---------------- VISTA MAGAZZINO CARAMELLE ---------------- */
