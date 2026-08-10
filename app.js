@@ -434,3 +434,22 @@ function fmtMoney(v) {
 function esc(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+function renderMultiInput(whIdx, code, type, size) {
+  const c = getCount(whIdx, code);
+  const arr = c[type] || [0];
+  let html = `<div style="display:flex; flex-direction:column; gap:4px;">`;
+  
+  arr.forEach((val, idx) => {
+    html += `
+      <div style="display:flex; align-items:center; gap:4px;">
+        <input type="number" step="any" min="0" value="${val !== 0 ? val : ''}" placeholder="0" 
+          oninput="handleCountInput(${whIdx}, '${code}', '${type}', ${idx}, this.value)" 
+          style="width:65px; padding:4px; text-align:center; border:1px solid #ccc; border-radius:4px;">
+        ${arr.length > 1 ? `<button onclick="removeInputRow(${whIdx}, '${code}', '${type}', ${idx})" style="background:#d32f2f; color:white; border:none; border-radius:4px; width:20px; height:20px; cursor:pointer; font-size:10px;">×</button>` : ''}
+      </div>
+    `;
+  });
+  
+  html += `</div>`;
+  return html;
+}
