@@ -255,7 +255,7 @@ function n(v) {
 }
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
-/* PARSER MAGAZZINO DINAMICO ROBUSTO */
+/* PARSER MAGAZZINO ROBUSTO */
 function parseMag(m) {
   const out = [];
 
@@ -263,35 +263,24 @@ function parseMag(m) {
     const r = m[i];
     if (!r || !r.length) continue;
 
-    // L'Unità di Misura si trova sempre in Colonna C (indice 2)
     const uom = text(r[2]).trim().toUpperCase();
 
-    // Riconosciamo una vera riga prodotto SOLO se la colonna U.M. contiene PZ, KG, LT, ecc.
     if (!uom || (uom !== "PZ" && uom !== "KG" && uom !== "LT" && uom !== "CL" && uom !== "GR")) {
       continue;
     }
 
-    // Il NOME del prodotto si trova nella riga IMMEDIATAMENTE SOTTO (i+1) in Colonna B (indice 1)
     let name = "";
     if (i + 1 < m.length && m[i + 1]) {
       name = text(m[i + 1][1] || m[i + 1][0]).trim();
     }
 
-    // Se per qualche motivo la riga sotto non ha il nome, usiamo la descrizione di riga
     if (!name) {
       name = text(r[1]).trim();
     }
 
-    // Visto che i codici non ti servono, usiamo il Nome sia come Codice che come Nome
-    const code = name;
-    const rawCode = name;
+    const rawCode = text(r[1]).trim();
+    const code = cleanCode(rawCode);
 
-    // Mappatura colonne del report Stock Variance:
-    // Colonna F (5)  -> Iniziale
-    // Colonna O (14) -> Danni / Wastage
-    // Colonna S (18) -> Venduto
-    // Colonna X (23) -> Atteso / Closing Balance
-    // Colonna AD (29)-> Costo Standard
     const iniziale = n(r[5]);
     const danni = n(r[14]);
     const venduto = n(r[18]);
@@ -317,36 +306,51 @@ function parseMag(m) {
   }
 
   if (out.length === 0) {
-    throw new Error("Nessun prodotto trovato. Assicurati che sia il file Stock Variance Report.");
+    throw new Error("Nessun prodotto trovato nel report Magazzino.");
   }
 
   return out;
 }
 
+/* PARSER SIZE ULTRA-TOLLERANTE */
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
-    if (m[i] && m[i].some(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO", "NOME", "CODICE", "CODE"].includes(norm(v)))) { 
-      h = i; 
-      break; 
+    if (!m[i]) continue;
+    const rowStr = m[i].map(v => norm(v)).join(" ");
+    if (rowStr.includes("PRODOTTO") || rowStr.includes("DESCRIZIONE") || rowStr.includes("ARTICOLO") || rowStr.includes("BOX") || rowStr.includes("SIZE")) {
+      h = i;
+      break;
     }
   }
 
   let codeCol = -1, pCol = -1, boxCol = -1, sleeveCol = -1;
   if (h >= 0) {
     const head = m[h];
-    codeCol = head.findIndex(v => ["CODICE", "CODE", "ITEM NO"].includes(norm(v)));
-    pCol = head.findIndex(v => ["PRODOTTO", "DESCRIZIONE", "ARTICOLO", "NAME"].includes(norm(v)));
-    boxCol = head.findIndex(v => norm(v).includes("BOX"));
-    sleeveCol = head.findIndex(v => norm(v).includes("SLEEVE"));
+    codeCol = head.findIndex(v => {
+      const nV = norm(v);
+      return nV === "CODICE" || nV === "CODE" || nV.includes("ITEM") || nV.includes("ARTICOLO");
+    });
+    pCol = head.findIndex(v => {
+      const nV = norm(v);
+      return nV.includes("PRODOTTO") || nV.includes("DESCRIZIONE") || nV.includes("NOME") || nV.includes("NAME");
+    });
+    boxCol = head.findIndex(v => {
+      const nV = norm(v);
+      return nV.includes("BOX") || nV.includes("CARTONE") || nV.includes("CT") || nV.includes("COLLO");
+    });
+    sleeveCol = head.findIndex(v => {
+      const nV = norm(v);
+      return nV.includes("SLEEVE") || nV.includes("PACCO") || nV.includes("STECCA") || nV.includes("BLISTER");
+    });
   }
 
-  if (pCol < 0) pCol = 0;
-  if (boxCol < 0) boxCol = 1;
-  if (sleeveCol < 0) sleeveCol = 2;
+  if (pCol < 0) pCol = (codeCol === 0) ? 1 : 0;
+  if (boxCol < 0) boxCol = 2;
+  if (sleeveCol < 0) sleeveCol = 3;
 
   const out = [];
-  const startRow = h >= 0 ? h + 1 : 1;
+  const startRow = h >= 0 ? h + 1 : 0;
 
   for (let i = startRow; i < m.length; i++) {
     const r = m[i];
@@ -356,7 +360,8 @@ function parseSize(m) {
     const code = cleanCode(rawCode);
     const name = text(r[pCol]);
 
-    if ((!name && !code) || name === "#N/D" || ["PRODOTTO", "DESCRIZIONE"].includes(norm(name))) continue;
+    const normName = norm(name);
+    if ((!name && !code) || name === "#N/D" || normName.includes("PRODOTTO") || normName.includes("DESCRIZIONE")) continue;
 
     out.push({
       code,
@@ -372,6 +377,7 @@ function parseSize(m) {
   return out;
 }
 
+/* BUILD E ACCOPPIAMENTO */
 function build() {
   if (!mag.length || !size.length) {
     $("mainStatus").style.display = "block";
@@ -379,7 +385,6 @@ function build() {
     return;
   }
 
-  // Mappe per abbinamento per Codice e per Nome
   const sizeByCode = new Map();
   const sizeByName = new Map();
 
@@ -390,15 +395,9 @@ function build() {
 
   rows = mag.map(x => {
     let s = sizeByCode.get(x.code) || sizeByName.get(norm(x.name)) || {};
-    
-    let finalName = x.name;
-    if (s.name && (norm(finalName) === "PZ" || finalName.length <= 2)) {
-      finalName = s.name;
-    }
 
     return { 
       ...x, 
-      name: finalName,
       boxSize: s.boxSize || 0, 
       sleeveSize: s.sleeveSize || 0
     };
@@ -453,7 +452,7 @@ function render() {
 
   $("thead").innerHTML = `
     <tr>
-      <th colspan="3">PRODOTTO</th>
+      <th colspan="2">PRODOTTO</th>
       <th colspan="3">REPORT MAGAZZINO</th>
       <th colspan="2" class="grp-box">BOX</th>
       <th colspan="2" class="grp-sleeve">SLEEVE</th>
@@ -462,7 +461,7 @@ function render() {
       <th colspan="2" class="grp-valore">VALORIZZAZIONE</th>
     </tr>
     <tr>
-      <th>Codice</th><th>Prodotto</th><th>U.M.</th>
+      <th>Prodotto</th><th>U.M.</th>
       <th class="num">Iniziale</th><th class="num">Danni</th><th class="num">Venduto</th>
       <th class="num grp-box">Size</th><th class="grp-box">Q.tà Box</th>
       <th class="num grp-sleeve">Size</th><th class="grp-sleeve">Q.tà Sleeve</th>
@@ -487,7 +486,6 @@ function render() {
     const diffValore = diffTotale * (r.standardCost || 0);
 
     tr.innerHTML = `
-      <td>${esc(r.code)}</td>
       <td>${esc(r.name)}</td>
       <td>${esc(r.uom)}</td>
       <td class="num">${fmt(r.iniziale)}</td>
@@ -545,7 +543,6 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   const r = rows.find(x => x.code === code);
   if (!r) return;
 
-  // Gestione dinamica aggiunta campi input
   const container = $(`container-${code}-${type}`);
   if (container && idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
     const newInput = document.createElement("input");
@@ -560,12 +557,10 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
     container.appendChild(newInput);
   }
 
-  // Ricalcolo immediato dei totali per questa riga
   const effettivoGlobale = getGlobalRilevato(code, r);
   const diffTotale = effettivoGlobale - r.atteso;
   const diffValore = diffTotale * (r.standardCost || 0);
 
-  // Aggiornamento DOM immediato
   const effEl = $(`eff-${code}`);
   const diffEl = $(`diff-${code}`);
   const valEl = $(`val-${code}`);
@@ -626,7 +621,7 @@ function exportToExcel() {
 
   const totData = [
     [`CINEMA / SEDE: ${cinemaName.toUpperCase()}`],
-    ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale", "Differenza Pezzi", "Costo Standard", "Differenza Valore (€)"]
+    ["Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale", "Differenza Pezzi", "Costo Standard", "Differenza Valore (€)"]
   ];
 
   rows.forEach(r => {
@@ -635,7 +630,6 @@ function exportToExcel() {
     const diffVal = diffTot * (r.standardCost || 0);
 
     totData.push([
-      r.code,
       r.name,
       r.uom,
       r.iniziale,
@@ -655,7 +649,7 @@ function exportToExcel() {
   warehouses.forEach((whName, idx) => {
     const whData = [
       [`MAGAZZINO: ${whName.toUpperCase()} — SEDE: ${cinemaName.toUpperCase()}`],
-      ["Codice", "Prodotto", "U.M.", "Box Size", "Q.tà Box (Tot)", "Sleeve Size", "Q.tà Sleeve (Tot)", "Q.tà Sfuso (Tot)", "Totale Rilevato (Pezzi)"]
+      ["Prodotto", "U.M.", "Box Size", "Q.tà Box (Tot)", "Sleeve Size", "Q.tà Sleeve (Tot)", "Q.tà Sfuso (Tot)", "Totale Rilevato (Pezzi)"]
     ];
 
     rows.forEach(r => {
@@ -666,7 +660,6 @@ function exportToExcel() {
       const effettivoWh = (bSum * r.boxSize) + (sSum * r.sleeveSize) + sfSum;
 
       whData.push([
-        r.code,
         r.name,
         r.uom,
         r.boxSize || 0,
