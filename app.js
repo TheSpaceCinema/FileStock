@@ -258,76 +258,88 @@ function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "
 function parseMag(m) {
   let headerRow = -1;
   
-  // 1. Cerca la riga di intestazione del report Stock Variance
+  // 1. Cerca la riga di intestazione
   for (let i = 0; i < m.length; i++) {
     if (!m[i]) continue;
     const rowStr = m[i].map(v => norm(v)).join(" ");
-    if (rowStr.includes("OPENING BALANCE") || rowStr.includes("CLOSING BALANCE")) {
+    if (rowStr.includes("OPENING BALANCE") || rowStr.includes("CLOSING BALANCE") || rowStr.includes("HISTORICAL")) {
       headerRow = i;
       break;
     }
   }
 
-  // Se trova l'intestazione parte da lì, altrimenti dalla riga 12 (standard di questi report)
-  const startRow = headerRow >= 0 ? headerRow + 1 : 12;
+  const startRow = headerRow >= 0 ? headerRow + 1 : 10;
   const out = [];
 
   for (let i = startRow; i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
 
-    // In colonna A (indice 0) c'è il Codice Prodotto
     const cellA = text(r[0]);
+    const normA = norm(cellA);
 
-    // Ignora righe vuote, intestazioni di sezione (es. FOOD) o descrizioni
-    if (cellA && /^\d+$/.test(cellA)) {
-      const rawCode = cellA;
-      const code = cleanCode(rawCode);
-
-      // Il nome del prodotto sta nella riga SUCCESSIVA (i + 1) sempre in colonna A!
-      let name = "";
-      if (i + 1 < m.length && m[i + 1]) {
-        name = text(m[i + 1][0]);
-      }
-
-      // Se non trova il nome sotto o la riga è ambigua
-      if (!name || /^\d+$/.test(name)) {
-        name = "Prodotto " + code;
-      }
-
-      // Mappatura esatta sulle colonne del report The Space Cinema:
-      // Colonna C (2) o I (8) -> UOM
-      // Colonna L (11) -> Opening Balance (Iniziale)
-      // Colonna Q (16) -> Less Wastage (Danni)
-      // Colonna S (18) -> Less Sales (Venduto)
-      // Colonna W (22) -> Closing Balance (Atteso)
-      // Colonna AG (32) -> Std Cost (Costo Unitario)
-
-      const uom = text(r[2] || r[8] || "PZ");
-      const iniziale = n(r[11]);
-      const danni = n(r[16]);
-      const venduto = n(r[18]);
-      const atteso = n(r[22]);
-      
-      // Costo unitario positivo (colonna AG / indice 32)
-      let standardCost = Math.abs(n(r[32]));
-
-      out.push({
-        rawCode,
-        code,
-        name,
-        uom: uom.toUpperCase(),
-        iniziale,
-        danni,
-        venduto,
-        atteso,
-        standardCost
-      });
+    // Salta righe di intestazione, totali o vuote
+    if (!cellA || 
+        normA.includes("STOCK LOCATION") || 
+        normA.includes("STOCKTAKE") || 
+        normA.includes("HISTORICAL") || 
+        normA.includes("PLEASE TAKE") || 
+        normA.includes("OPENING BALANCE") || 
+        normA.includes("TOTAL") || 
+        normA.includes("CONCESSIONS STORE") ||
+        normA === "FOOD" || normA === "BEVERAGE" || normA === "PACKAGING") {
+      continue;
     }
+
+    // Se arriviamo qui, la riga i contiene il CODICE
+    const rawCode = cellA;
+    const code = cleanCode(rawCode);
+
+    // Cerca il NOME del prodotto: di norma è nella riga SUBITO SOTTO (i+1) in colonna A
+    let name = "";
+    if (i + 1 < m.length && m[i + 1]) {
+      const nextCellA = text(m[i + 1][0]);
+      // Verifica che la riga sotto sia effettivamente una descrizione (e non un altro codice)
+      if (nextCellA && !/^\d+$/.test(nextCellA) && !norm(nextCellA).includes("TOTAL")) {
+        name = nextCellA;
+      }
+    }
+
+    // Se non trova il nome sotto, verifica se per caso sta sulla stessa riga
+    if (!name) {
+      name = text(r[1]) || text(r[2]) || ("Prodotto " + code);
+    }
+
+    // Mappatura colonne del report Stock Variance
+    const uom = text(r[2] || r[8] || "PZ");
+    const iniziale = n(r[11]);
+    const danni = n(r[16]);
+    const venduto = n(r[18]);
+    
+    // Atteso (Closing Balance)
+    let atteso = n(r[22]);
+    if (atteso === 0 && (iniziale > 0 || venduto > 0)) {
+      atteso = iniziale - danni - venduto;
+    }
+
+    // Costo unitario (Std Cost)
+    const standardCost = Math.abs(n(r[32] || r[30] || 0));
+
+    out.push({
+      rawCode,
+      code,
+      name,
+      uom: uom.toUpperCase(),
+      iniziale,
+      danni,
+      venduto,
+      atteso,
+      standardCost
+    });
   }
 
   if (out.length === 0) {
-    throw new Error("Nessun prodotto trovato. Assicurati che sia il file Stock Variance Report.");
+    throw new Error("Nessun prodotto trovato. Verifica la struttura del file caricato.");
   }
 
   return out;
