@@ -380,7 +380,7 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
-// Calcola la quantità rilevata GLOBALE per un prodotto in TUTTI i magazzini
+// Calcola la quantità rilevata GLOBALE (somma di TUTTI i magazzini)
 function getGlobalRilevato(code, r) {
   let totBox = 0, totSleeve = 0, totSfuso = 0;
   warehouses.forEach((_, idx) => {
@@ -409,7 +409,7 @@ function render() {
       <th colspan="2" class="grp-box">BOX</th>
       <th colspan="2" class="grp-sleeve">SLEEVE</th>
       <th class="grp-sfuso">SFUSO</th>
-      <th colspan="3">CONFRONTO GLOBALE</th>
+      <th colspan="3">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
       <th colspan="2" class="grp-valore">VALORIZZAZIONE</th>
     </tr>
     <tr>
@@ -427,7 +427,6 @@ function render() {
 
   data.forEach(r => {
     const tr = document.createElement("tr");
-    tr.id = `row-${r.code}`;
 
     const c = getCount(currentTab, r.code);
     const boxLocal = sumArr(c.box);
@@ -473,43 +472,46 @@ function renderMultiInput(whIdx, code, type) {
   let html = `<div class="input-scroll-cell" id="container-${code}-${type}">`;
 
   arr.forEach((val, idx) => {
-    html += `<input class="qty-input" type="number" min="0" value="${val || ''}" 
-              oninput="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
+    html += `<input class="qty-input" type="number" step="any" min="0" value="${val || ''}" 
+              onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)"
+              onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
   });
 
   if (arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
-    html += `<input class="qty-input" type="number" min="0" value="" placeholder="+" 
-              oninput="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)">`;
+    html += `<input class="qty-input" type="number" step="any" min="0" value="" placeholder="+" 
+              onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)"
+              onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)">`;
   }
 
   html += `</div>`;
   return html;
 }
 
-/* AGGIORNAMENTO FLUIDO: Non ridisegna la tabella per evitare perdita di focus */
+/* RISOLUZIONE FOCUS E CALCOLO GLOBALE */
 function updateCountValue(whIdx, code, type, idx, inputEl) {
   const c = getCount(whIdx, code);
   const val = inputEl.value;
   c[type][idx] = n(val);
 
-  // Trova il riferimento al prodotto
   const r = rows.find(x => x.code === code);
   if (!r) return;
 
-  // Se l'utente ha inserito un numero nel campo "+" in fondo, aggiungiamo una nuova casella vuota accanto
+  // Aggiunge nuova casella "+" se compilata l'ultima, senza distruggere quelle esistenti
   const container = $(`container-${code}-${type}`);
   if (container && idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
     const newInput = document.createElement("input");
     newInput.className = "qty-input";
     newInput.type = "number";
+    newInput.step = "any";
     newInput.min = "0";
     newInput.value = "";
     newInput.placeholder = "+";
-    newInput.oninput = function() { updateCountValue(whIdx, code, type, c[type].length, this); };
+    newInput.onkeyup = function() { updateCountValue(whIdx, code, type, c[type].length, this); };
+    newInput.onchange = function() { updateCountValue(whIdx, code, type, c[type].length, this); };
     container.appendChild(newInput);
   }
 
-  // Aggiorna solo i valori calcolati nella riga corrente
+  // Aggiorna solo il calcolo GLOBALE della riga corrente
   const effettivoGlobale = getGlobalRilevato(code, r);
   const diffTotale = effettivoGlobale - r.atteso;
   const diffValore = diffTotale * (r.standardCost || 0);
@@ -532,7 +534,6 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   recalcKPIs();
 }
 
-/* Ricalcola i valori KPI globali in cima alla pagina */
 function recalcKPIs() {
   let totalAttesoPezzi = 0;
   let totalRilevatoPezzi = 0;
