@@ -12,30 +12,30 @@
     body { background-color: #f4f6f9; color: #333; line-height: 1.5; padding-bottom: 40px; }
     
     .header { background-color: #1a237e; color: white; padding: 15px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-    .header-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; }
-    .header h1 { font-size: 1.5rem; font-weight: 600; }
+    .header-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; flex-wrap: wrap; gap: 10px; }
+    .header h1 { font-size: 1.4rem; font-weight: 600; }
+    .header-btns { display: flex; gap: 10px; }
     
     .container { max-width: 1400px; margin: 20px auto; padding: 0 15px; }
     .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
     
     .files-card { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .file-upload-block { border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center; background: #fafafa; }
-    .file-upload-block h3 { margin-bottom: 10px; font-size: 1rem; color: #444; }
-    .status-text { margin-top: 8px; font-size: 0.85rem; color: #666; font-style: italic; }
+    @media (max-width: 768px) { .files-card { grid-template-columns: 1fr; } }
+    .file-upload-block { border: 2px dashed #ccc; padding: 20px; border-radius: 6px; text-align: center; background: #fafafa; }
+    .file-upload-block h3 { margin-bottom: 10px; font-size: 1.1rem; color: #1a237e; }
+    .status-text { margin-top: 10px; font-size: 0.9rem; color: #2e7d32; font-weight: bold; }
     
-    .info-card { text-align: center; color: #555; font-size: 1.1rem; padding: 30px; }
+    .info-card { text-align: center; color: #555; font-size: 1.1rem; padding: 25px; }
     
     /* TABS */
     .tabs-bar { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
     .tab-btn { padding: 10px 18px; border: none; background: #e0e0e0; color: #333; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; white-space: nowrap; }
     .tab-btn:hover { background: #d5d5d5; }
     .tab-btn.active { background: #1a237e; color: white; }
-    .tab-btn.setup-btn { background: #555; color: white; margin-left: auto; }
-    .tab-btn.setup-btn.active { background: #000; }
 
     /* TOOLBAR */
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; }
-    .search-input { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    .search-input { flex: 1; min-width: 220px; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
     .count-badge { font-weight: bold; color: #666; white-space: nowrap; }
 
     /* BUTTONS */
@@ -46,10 +46,9 @@
     .btn-secondary:hover { background-color: #e8eaf6; }
     .btn-success { background-color: #2e7d32; color: white; }
     .btn-success:hover { background-color: #1b5e20; }
-    .btn-danger { background-color: #d32f2f; color: white; }
-    .btn-danger:hover { background-color: #b71c1c; }
     .btn-warning { background-color: #f57c00; color: white; }
     .btn-warning:hover { background-color: #e65100; }
+    .btn-danger { background-color: #d32f2f; color: white; }
 
     /* TABELLA */
     .table-container { overflow-x: auto; padding: 0; }
@@ -73,29 +72,58 @@
 
   <header class="header">
     <div class="header-content">
-      <h1 id="appTitle">📊 Gestione Inventario Cinema</h1>
-      <button class="btn btn-secondary" onclick="toggleFilesSection()">📁 Caricamento File</button>
+      <h1 id="appTitle">📊 Gestione Inventario</h1>
+      <div class="header-btns">
+        <button class="btn btn-secondary" onclick="openSetupView()">⚙️ Configura Cinema e Magazzini</button>
+        <button class="btn btn-secondary" onclick="toggleFilesSection()">📁 Caricamento File</button>
+      </div>
     </div>
   </header>
 
   <main class="container">
+
+    <!-- VISTA SETUP MAGAZZINI & CINEMA -->
+    <section id="setupView" class="card">
+      <h2 style="color: #1a237e; margin-bottom: 10px;">⚙️ Passo 1: Configurazione Sede & Magazzini</h2>
+      <p style="color:#666; margin-bottom: 20px;">Seleziona il tuo cinema e definisci le postazioni/magazzini in cui effettuerai il conteggio.</p>
+      
+      <div style="margin-bottom: 20px;">
+        <label for="cinemaSelect" style="font-weight: bold; display: block; margin-bottom: 6px;">Seleziona Sede / Cinema:</label>
+        <select id="cinemaSelect" style="width: 100%; max-width: 450px; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 1rem;" onchange="handleCinemaSelectChange()">
+        </select>
+
+        <div id="customCinemaDiv" style="display: none; margin-top: 10px;">
+          <label for="customCinemaInput" style="font-size: 0.9em; display: block; margin-bottom: 3px;">Inserisci Nome Nuovo Cinema:</label>
+          <input type="text" id="customCinemaInput" placeholder="Es. TSC Nuova Sede" style="width: 100%; max-width: 450px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px;">
+        </div>
+      </div>
+
+      <h3 style="margin-bottom: 10px; font-size: 1.1rem;">Magazzini / Postazioni di Conteggio:</h3>
+      <div id="whList" style="margin-top: 10px; max-width: 600px;"></div>
+
+      <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="btn btn-secondary" onclick="addWarehouseInput()">➕ Aggiungi Magazzino</button>
+        <button class="btn btn-primary" onclick="saveWarehousesSetup()">💾 Salva e Prosegui al Caricamento File</button>
+      </div>
+    </section>
+
     <!-- SEZIONE CARICAMENTO FILE -->
     <section id="filesSection" class="card files-card">
       <div class="file-upload-block">
         <h3>1. Report Magazzino</h3>
         <input type="file" id="magFile" accept=".xlsx, .xls">
-        <p id="magStatus" class="status-text">Seleziona il report magazzino</p>
+        <p id="magStatus" class="status-text">Seleziona il report di magazzino (.xlsx)</p>
       </div>
       <div class="file-upload-block">
         <h3>2. Anagrafica SIZE</h3>
         <input type="file" id="sizeFile" accept=".xlsx, .xls">
-        <p id="sizeStatus" class="status-text">Seleziona l'anagrafica SIZE</p>
+        <p id="sizeStatus" class="status-text">Seleziona l'anagrafica SIZE (.xlsx)</p>
       </div>
     </section>
 
-    <!-- STATO PRINCIPALE -->
+    <!-- STATO AVVISO INIZIALE -->
     <div id="mainStatus" class="card info-card">
-      Carica entrambi i file per iniziare la gestione dell'inventario.
+      📂 Carica entrambi i file Excel in alto per visualizzare la tabella dei prodotti.
     </div>
 
     <!-- CONTENUTO TABELLA & TABS -->
@@ -124,30 +152,6 @@
       </div>
     </div>
 
-    <!-- VISTA SETUP MAGAZZINI & CINEMA -->
-    <div id="setupView" class="card" style="display: none;">
-      <h2>⚙️ Configurazione Cinema & Magazzini</h2>
-      <p style="color:#666; margin-bottom: 15px;">Seleziona la tua struttura dall'elenco e imposta i magazzini presenti. Le impostazioni verranno salvate su questo computer.</p>
-      
-      <div style="margin-bottom: 20px;">
-        <label for="cinemaSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">Seleziona Sede / Cinema:</label>
-        <select id="cinemaSelect" style="width: 100%; max-width: 400px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem;" onchange="handleCinemaSelectChange()">
-        </select>
-
-        <div id="customCinemaDiv" style="display: none; margin-top: 10px;">
-          <label for="customCinemaInput" style="font-size: 0.9em; display: block; margin-bottom: 3px;">Inserisci Nome Nuovo Cinema:</label>
-          <input type="text" id="customCinemaInput" placeholder="Es. TSC Nuova Sede" style="width: 100%; max-width: 400px; padding: 6px 10px;">
-        </div>
-      </div>
-
-      <h3>Elenco Magazzini della Sede:</h3>
-      <div id="whList" style="margin-top: 10px;"></div>
-
-      <div style="margin-top: 20px; display: flex; gap: 10px;">
-        <button class="btn btn-secondary" onclick="addWarehouseInput()">➕ Aggiungi Magazzino</button>
-        <button class="btn btn-primary" onclick="saveWarehousesSetup()">💾 Salva e Applica</button>
-      </div>
-    </div>
   </main>
 
   <script>
@@ -174,6 +178,7 @@
       loadSetupFromStorage();
       loadCountsFromStorage();
       updateHeaderTitle();
+      renderSetupForm();
 
       $("magFile").addEventListener("change", e => {
         const f = e.target.files[0];
@@ -181,10 +186,10 @@
         $("magStatus").textContent = "Lettura del report in corso...";
         readMatrix(f).then(m => {
           mag = parseMag(m);
-          $("magStatus").textContent = `${f.name} — ${mag.length} prodotti letti`;
+          $("magStatus").textContent = `✓ ${f.name} (${mag.length} articoli)`;
           build();
         }).catch(err => {
-          $("magStatus").textContent = "Errore nel caricamento del file";
+          $("magStatus").textContent = "❌ Errore file Magazzino";
           showError("Errore file Magazzino: " + err.message);
         });
       });
@@ -195,10 +200,10 @@
         $("sizeStatus").textContent = "Lettura anagrafica in corso...";
         readMatrix(f, "SIZE").then(m => {
           size = parseSize(m);
-          $("sizeStatus").textContent = `${f.name} — ${size.length} prodotti letti`;
+          $("sizeStatus").textContent = `✓ ${f.name} (${size.length} articoli)`;
           build();
         }).catch(err => {
-          $("sizeStatus").textContent = "Errore nel caricamento del file";
+          $("sizeStatus").textContent = "❌ Errore file SIZE";
           showError("Errore file SIZE: " + err.message);
         });
       });
@@ -248,6 +253,13 @@
       $("customCinemaDiv").style.display = (sel === "__CUSTOM__") ? "block" : "none";
     }
 
+    function openSetupView() {
+      $("setupView").style.display = "block";
+      $("filesSection").style.display = "grid";
+      renderSetupForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     function saveWarehousesSetup() {
       const sel = $("cinemaSelect").value;
       if (sel === "__CUSTOM__") {
@@ -272,14 +284,16 @@
       localStorage.setItem("cinema_warehouses", JSON.stringify(warehouses));
       
       updateHeaderTitle();
-      currentTab = 0;
-      switchTab();
+      $("setupView").style.display = "none";
+      
+      if (rows.length > 0) {
+        currentTab = 0;
+        renderTabs();
+        render();
+      }
     }
 
-    function renderSetupView() {
-      $("tabContent").style.display = "none";
-      $("setupView").style.display = "block";
-      
+    function renderSetupForm() {
       const select = $("cinemaSelect");
       select.innerHTML = "";
 
@@ -299,8 +313,6 @@
         customOpt.selected = true;
         $("customCinemaDiv").style.display = "block";
         $("customCinemaInput").value = cinemaName;
-      } else {
-        $("customCinemaDiv").style.display = "none";
       }
       select.appendChild(customOpt);
       
@@ -310,7 +322,7 @@
         const div = document.createElement("div");
         div.style.cssText = "display: flex; gap: 10px; margin-bottom: 8px;";
         div.innerHTML = `
-          <input class="wh-input-item" value="${esc(w)}" placeholder="Nome Magazzino" style="flex:1; padding: 6px 10px;">
+          <input class="wh-input-item" value="${esc(w)}" placeholder="Nome Magazzino" style="flex:1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px;">
           <button class="btn btn-danger" onclick="this.parentElement.remove()">Elimina</button>
         `;
         container.appendChild(div);
@@ -322,7 +334,7 @@
       const div = document.createElement("div");
       div.style.cssText = "display: flex; gap: 10px; margin-bottom: 8px;";
       div.innerHTML = `
-        <input class="wh-input-item" value="Magazzino ${container.children.length + 1}" placeholder="Nome Magazzino" style="flex:1; padding: 6px 10px;">
+        <input class="wh-input-item" value="Magazzino ${container.children.length + 1}" placeholder="Nome Magazzino" style="flex:1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px;">
         <button class="btn btn-danger" onclick="this.parentElement.remove()">Elimina</button>
       `;
       container.appendChild(div);
@@ -336,32 +348,15 @@
         const btn = document.createElement("button");
         btn.className = `tab-btn ${currentTab === idx ? 'active' : ''}`;
         btn.textContent = `📍 ${w}`;
-        btn.onclick = () => { currentTab = idx; switchTab(); };
+        btn.onclick = () => { currentTab = idx; renderTabs(); render(); };
         bar.appendChild(btn);
       });
 
       const totBtn = document.createElement("button");
       totBtn.className = `tab-btn ${currentTab === 'tot' ? 'active' : ''}`;
       totBtn.textContent = `📊 RIEPILOGO TOTALE`;
-      totBtn.onclick = () => { currentTab = 'tot'; switchTab(); };
+      totBtn.onclick = () => { currentTab = 'tot'; renderTabs(); render(); };
       bar.appendChild(totBtn);
-
-      const setupBtn = document.createElement("button");
-      setupBtn.className = `tab-btn setup-btn ${currentTab === 'setup' ? 'active' : ''}`;
-      setupBtn.textContent = `⚙️ Setup Magazzini`;
-      setupBtn.onclick = () => { currentTab = 'setup'; switchTab(); };
-      bar.appendChild(setupBtn);
-    }
-
-    function switchTab() {
-      renderTabs();
-      if (currentTab === 'setup') {
-        renderSetupView();
-      } else {
-        $("setupView").style.display = "none";
-        $("tabContent").style.display = "block";
-        render();
-      }
     }
 
     function readMatrix(file, preferredSheetName = "") {
@@ -381,7 +376,7 @@
             resolve(XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "", raw: true }));
           } catch (x) { reject(x); }
         };
-        r.onerror = () => reject(new Error("Errore nella lettura fisica del file."));
+        r.onerror = () => reject(new Error("Errore nella lettura del file."));
         r.readAsArrayBuffer(file);
       });
     }
@@ -403,7 +398,7 @@
       for (let i = 0; i < m.length; i++) {
         if (m[i] && m[i].some(v => norm(v) === "OPENING BALANCE")) { header = i; break; }
       }
-      if (header < 0) throw new Error("Intestazione 'Opening Balance' non trovata.");
+      if (header < 0) throw new Error("Intestazione 'Opening Balance' non trovata nel report.");
       
       const out = [];
       for (let i = header + 1; i < m.length; i++) {
@@ -418,7 +413,6 @@
         const iniziale = n(r[5]), ricevuti = n(r[8]), trasferimenti = n(r[10]), rettifiche = n(r[12]);
         const danni = n(r[14]), venduto = n(r[18]), uso = n(r[21]);
         
-        // Formula completa per il calcolo delle giacenze attese
         const atteso = iniziale + ricevuti + trasferimenti + rettifiche - danni - venduto - uso;
         
         out.push({ code, name, uom, iniziale, danni, venduto, atteso });
@@ -431,7 +425,7 @@
       for (let i = 0; i < m.length; i++) {
         if (m[i] && m[i].some(v => norm(v) === "PRODOTTO")) { h = i; break; }
       }
-      if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nel file SIZE.");
+      if (h < 0) throw new Error("Intestazione 'PRODOTTO' non trovata nell'anagrafica SIZE.");
 
       const head = m[h];
       let pCol = head.findIndex(v => norm(v) === "PRODOTTO");
@@ -460,11 +454,8 @@
     }
 
     function build() {
-      if (!mag.length || !size.length) {
-        $("mainStatus").style.display = "block";
-        $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> · SIZE: <b>${size.length}</b><br>Carica entrambi i file per continuare.`;
-        return;
-      }
+      if (!mag.length || !size.length) return;
+
       const sm = new Map(size.map(x => [norm(x.name), x]));
       rows = mag.map(x => {
         const s = sm.get(norm(x.name)) || {};
@@ -476,7 +467,9 @@
       });
 
       $("filesSection").style.display = "none";
+      $("setupView").style.display = "none";
       $("mainStatus").style.display = "none";
+      $("tabContent").style.display = "block";
 
       renderTabs();
       render();
@@ -489,8 +482,6 @@
     }
 
     function render() {
-      if (currentTab === 'setup') return;
-
       const q = norm($("search").value);
       const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
       $("count").textContent = `${data.length} prodotti`;
