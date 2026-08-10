@@ -123,7 +123,6 @@ function parseReportData(json) {
   });
   localStorage.setItem("cinema_rows", JSON.stringify(rows));
 }
-
 function parseSizeData(json) {
   json.forEach((row, idx) => {
     if (!row || row.length === 0) return;
