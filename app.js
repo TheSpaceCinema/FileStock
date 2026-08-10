@@ -17,6 +17,47 @@ const DEFAULT_CINEMAS = [
   "TSC Torri di Quartesolo", "TSC Trieste", "TSC Vimercate"
 ];
 
+/* --- CONFIGURAZIONE DINAMICA GRIGLIA CARAMELLE PER CINEMA --- */
+let candyGridConfigs = JSON.parse(localStorage.getItem("candy_grid_configs")) || {};
+
+function getActiveCinemaCandyConfig() {
+  if (!candyGridConfigs[cinemaName]) {
+    // Configurazione predefinita di default per ogni cinema
+    candyGridConfigs[cinemaName] = {
+      columns: 22, 
+      rows: 4, 
+      taraBins: [0.37, 0.72, 0.50, 0.50],
+      gridValues: {}, // [r][c] = peso
+      buste: Array(10).fill({kg: 0, sleeve: 0})
+    };
+  }
+  return candyGridConfigs[cinemaName];
+}
+
+function saveCandyConfig() {
+  localStorage.setItem("candy_grid_configs", JSON.stringify(candyGridConfigs));
+}
+
+function getCandyTotalKg() {
+  const cfg = getActiveCinemaCandyConfig();
+  let total = 0;
+  // Calcolo griglia dinamica
+  for(let r=0; r<cfg.rows; r++) {
+    for(let c=0; c<cfg.columns; c++) {
+      let val = n(cfg.gridValues[r]?.[c] || 0);
+      let tara = n(cfg.taraBins[r] || 0);
+      total += Math.max(0, val - tara);
+    }
+  }
+  // Calcolo buste sciolte / kit
+  if (Array.isArray(cfg.buste)) {
+    cfg.buste.forEach(b => {
+      total += n(b.kg) + (n(b.sleeve) * 0.1);
+    });
+  }
+  return total;
+}
+
 const $ = id => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -196,6 +237,14 @@ function renderTabs() {
     btn.onclick = () => { currentTab = idx; switchTab(); };
     bar.appendChild(btn);
   });
+
+  // Aggiungiamo dinamicamente il tab speciale se configurato o gestito
+  const candyTabIdx = warehouses.length;
+  const btnCandy = document.createElement("button");
+  btnCandy.className = `tab-btn ${currentTab === 'candy' ? 'active' : ''}`;
+  btnCandy.textContent = `🍬 Magazzino Caramelle`;
+  btnCandy.onclick = () => { currentTab = 'candy'; switchTab(); };
+  bar.appendChild(btnCandy);
 
   const totBtn = document.createElement("button");
   totBtn.className = `tab-btn ${currentTab === 'tot' ? 'active' : ''}`;
@@ -470,7 +519,7 @@ function build() {
   $("setupView").style.display = "none";
   $("tabContent").style.display = "block";
 
-  if (typeof currentTab === 'string') currentTab = 0;
+  if (typeof currentTab === 'string' && currentTab !== 'tot' && currentTab !== 'candy') currentTab = 0;
 
   renderTabs();
   render();
@@ -536,12 +585,24 @@ function getGlobalRilevato(code, r) {
   });
   
   let basePezzi = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+  
+  // Se il prodotto è Caramelle Aermont, aggiungiamo anche il totale Kg calcolato dal magazzino caramelle dedicato di questo cinema
+  if (norm(r.name).includes("CARAMELLE") && norm(r.name).includes("AERMONT")) {
+    basePezzi += getCandyTotalKg();
+  }
+
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
 
-/* ---------------- TABLE RENDER ---------------- */
+/* ---------------- TABLE RENDER & MAG. CARAMELLE ---------------- */
 function render() {
   if (currentTab === 'setup') return;
+
+  // Se siamo sul tab del Magazzino Caramelle specifico per questo cinema
+  if (currentTab === 'candy') {
+    renderCandyView();
+    return;
+  }
 
   const q = norm($("search").value);
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
@@ -640,6 +701,102 @@ function render() {
   });
 
   recalcKPIs();
+}
+
+function renderCandyView() {
+  const cfg = getActiveCinemaCandyConfig();
+  $("count").textContent = `Gestione Caramelle (${cinemaName})`;
+  
+  $("thead").innerHTML = `
+    <tr>
+      <th style="background: #212529; color: white; padding: 12px;">🍬 Magazzino Caramelle Dedicato — ${esc(cinemaName)}</th>
+    </tr>
+  `;
+
+  let html = `<tr><td style="padding: 20px; background: #f8f9fa;">
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px;">
+      <h3>Parametri Griglia</h3>
+      <div style="display: flex; gap: 20px; margin-top: 10px; align-items: center;">
+        <div>Colonne: <input type="number" id="candyCols" value="${cfg.columns}" style="width: 70px; padding: 5px;" onchange="updateCandyDim()"></div>
+        <div>Righe: <input type="number" id="candyRows" value="${cfg.rows}" style="width: 70px; padding: 5px;" onchange="updateCandyDim()"></div>
+        <div style="margin-left: auto; font-size: 1.2rem; font-weight: bold; color: #0d47a1;">Totale Caramelle: ${fmt(getCandyTotalKg())} Kg</div>
+      </div>
+    </div>
+
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: auto;">
+      <h4>Inserimento Pesi Lordi & Tare per Riga</h4>
+      <table style="width:100%; border-collapse: collapse; margin-top: 10px;">
+        <thead>
+          <tr style="background: #343a40; color: white;">
+            <th style="padding: 8px;">Riga / Tara (Kg)</th>`;
+  for(let c=0; c<cfg.columns; c++) {
+    html += `<th style="padding: 8px; text-align:center;">Col ${c+1}</th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  for(let r=0; r<cfg.rows; r++) {
+    let taraVal = cfg.taraBins[r] ?? 0;
+    html += `<tr>
+      <td style="background: #e9ecef; font-weight: bold; padding: 8px;">
+        Riga ${r+1} <br>
+        <small>Tara: <input type="number" step="any" value="${taraVal}" style="width:60px;" onchange="updateTara(${r}, this.value)"></small>
+      </td>`;
+    for(let c=0; c<cfg.columns; c++) {
+      let val = cfg.gridValues[r]?.[c] || "";
+      html += `<td style="border: 1px solid #dee2e6; padding: 4px; text-align: center;">
+        <input type="number" step="any" class="qty-input" value="${val}" style="width: 55px;" onchange="updateCandyCell(${r}, ${c}, this.value)">
+      </td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  // Sezione buste sciolte
+  html += `<div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-top: 20px;">
+    <h4>Buste / Sacchetti Sciolti</h4>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px;">`;
+  
+  for(let i=0; i<10; i++) {
+    let b = cfg.buste[i] || {kg: 0, sleeve: 0};
+    html += `<div style="background: #f1f3f5; padding: 10px; border-radius: 6px;">
+      <strong>Elemento ${i+1}</strong><br>
+      Kg: <input type="number" step="any" value="${b.kg || ''}" style="width:70px;" onchange="updateCandyBuste(${i}, 'kg', this.value)"><br>
+      Sleeve: <input type="number" step="any" value="${b.sleeve || ''}" style="width:70px; margin-top:4px;" onchange="updateCandyBuste(${i}, 'sleeve', this.value)">
+    </div>`;
+  }
+  html += `</div></div></td></tr>`;
+
+  $("tbody").innerHTML = html;
+}
+
+function updateCandyDim() {
+  const cfg = getActiveCinemaCandyConfig();
+  cfg.columns = parseInt($("candyCols").value) || 22;
+  cfg.rows = parseInt($("candyRows").value) || 4;
+  saveCandyConfig();
+  renderCandyView();
+}
+
+function updateTara(r, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if(!cfg.taraBins) cfg.taraBins = [];
+  cfg.taraBins[r] = n(val);
+  saveCandyConfig();
+}
+
+function updateCandyCell(r, c, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if(!cfg.gridValues[r]) cfg.gridValues[r] = {};
+  cfg.gridValues[r][c] = n(val);
+  saveCandyConfig();
+}
+
+function updateCandyBuste(idx, field, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if(!cfg.buste) cfg.buste = Array(10).fill({kg: 0, sleeve: 0});
+  if(!cfg.buste[idx]) cfg.buste[idx] = {kg: 0, sleeve: 0};
+  cfg.buste[idx][field] = n(val);
+  saveCandyConfig();
 }
 
 function renderMultiInput(whIdx, code, type, sizeVal) {
