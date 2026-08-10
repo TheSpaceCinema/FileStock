@@ -1,5 +1,5 @@
 /* ==========================================================================
-   GESTIONE INVENTARIO WEB APP — APP.JS (Versione Stabile Corretta)
+   GESTIONE INVENTARIO WEB APP — APP.JS (Versione Stabile Completa)
    ========================================================================== */
 
 let cinemaName = "TSC Nola";
@@ -62,8 +62,8 @@ function handleReportUpload(e) {
   const reader = new FileReader();
   reader.onload = function(evt) {
     try {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
+      const data = evt.target.result;
+      const workbook = XLSX.read(data, { type: 'binary' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
       
@@ -74,7 +74,7 @@ function handleReportUpload(e) {
       alert("Errore nella lettura del file Report: " + err.message);
     }
   };
-  reader.readAsArrayBuffer(file);
+  reader.readAsBinaryString(file);
 }
 
 function handleSizeUpload(e) {
@@ -123,6 +123,7 @@ function parseReportData(json) {
   });
   localStorage.setItem("cinema_rows", JSON.stringify(rows));
 }
+
 function parseSizeData(json) {
   json.forEach((row, idx) => {
     if (!row || row.length === 0) return;
