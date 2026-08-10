@@ -1,9 +1,6 @@
 let mag = [], size = [], rows = [];
-let warehouses = ["Magazzino 1", "Bar Principale", "Deposito"]; // Lista magazzini predefinita
-let currentTab = 0; // 0..N-1 = Magazzini, N = Totale Rilevato, 'setup' = Setup
-
-// Struttura dati per memorizzare i conteggi di ciascun magazzino
-// { [whIndex]: { [prodCode]: { box: 0, sleeve: 0, sfuso: 0 } } }
+let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
+let currentTab = 0; 
 let countsData = {}; 
 
 const $ = id => document.getElementById(id);
@@ -20,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
       $("magStatus").textContent = `${f.name} — ${mag.length} prodotti letti`;
       build();
     }).catch(err => {
+      $("magStatus").textContent = "Errore nel caricamento del file";
       showError("Errore file Magazzino: " + err.message);
     });
   });
@@ -33,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
       $("sizeStatus").textContent = `${f.name} — ${size.length} prodotti letti`;
       build();
     }).catch(err => {
+      $("sizeStatus").textContent = "Errore nel caricamento del file";
       showError("Errore file SIZE: " + err.message);
     });
   });
@@ -42,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function toggleFilesSection() {
   const sec = $("filesSection");
-  sec.style.display = sec.style.display === "none" ? "grid" : "none";
+  sec.style.display = (sec.style.display === "none") ? "grid" : "none";
 }
 
 /* ---------------- SETUP & STORAGE ---------------- */
@@ -76,7 +75,7 @@ function renderSetupView() {
   $("setupView").style.display = "block";
   const container = $("whList");
   container.innerHTML = "";
-  warehouses.forEach((w, idx) => {
+  warehouses.forEach((w) => {
     const div = document.createElement("div");
     div.className = "wh-item";
     div.innerHTML = `
@@ -111,14 +110,12 @@ function renderTabs() {
     bar.appendChild(btn);
   });
 
-  // Tab Totale Consolidato
   const totBtn = document.createElement("button");
   totBtn.className = `tab-btn ${currentTab === 'tot' ? 'active' : ''}`;
   totBtn.textContent = `📊 RIEPILOGO TOTALE`;
   totBtn.onclick = () => { currentTab = 'tot'; switchTab(); };
   bar.appendChild(totBtn);
 
-  // Tab Setup
   const setupBtn = document.createElement("button");
   setupBtn.className = `tab-btn setup-btn ${currentTab === 'setup' ? 'active' : ''}`;
   setupBtn.textContent = `⚙️ Setup Magazzini`;
@@ -145,6 +142,8 @@ function readMatrix(file, preferredSheetName = "") {
       try {
         if (typeof XLSX === "undefined") throw new Error("Libreria XLSX non presente.");
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
+        if (!wb.SheetNames || !wb.SheetNames.length) throw new Error("Nessun foglio trovato.");
+        
         let sheetName = wb.SheetNames[0];
         if (preferredSheetName) {
           const found = wb.SheetNames.find(s => norm(s).includes(norm(preferredSheetName)));
@@ -153,6 +152,7 @@ function readMatrix(file, preferredSheetName = "") {
         resolve(XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "", raw: true }));
       } catch (x) { reject(x); }
     };
+    r.onerror = () => reject(new Error("Errore nella lettura fisica del file."));
     r.readAsArrayBuffer(file);
   });
 }
@@ -195,6 +195,7 @@ function parseMag(m) {
   return out;
 }
 
+// FIX PARSESIZE PER IL NUOVO FILE SENZA RIGHE VUOTE INIZIALI
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
@@ -215,17 +216,23 @@ function parseSize(m) {
   for (let i = h + 1; i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
+
     const name = text(r[pCol]);
     if (!name || name === "#N/D" || norm(name) === "PRODOTTO") continue;
 
-    out.push({ name, boxSize: n(r[boxCol]), sleeveSize: n(r[sleeveCol]) });
+    out.push({
+      name,
+      boxSize: n(r[boxCol]),
+      sleeveSize: n(r[sleeveCol])
+    });
   }
   return out;
 }
 
 function build() {
   if (!mag.length || !size.length) {
-    $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> · SIZE: <b>${size.length}</b><br>Carica entrambi i file.`;
+    $("mainStatus").style.display = "block";
+    $("mainStatus").innerHTML = `Magazzino: <b>${mag.length}</b> · SIZE: <b>${size.length}</b><br>Carica entrambi i file per continuare.`;
     return;
   }
   const sm = new Map(size.map(x => [norm(x.name), x]));
@@ -238,7 +245,6 @@ function build() {
     };
   });
 
-  // Nasconde automaticamente il pannello file quando i dati sono pronti
   $("filesSection").style.display = "none";
   $("mainStatus").style.display = "none";
 
@@ -260,9 +266,8 @@ function render() {
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   $("count").textContent = `${data.length} prodotti`;
 
-  const isTotTab = currentTab === 'tot';
+  const isTotTab = (currentTab === 'tot');
 
-  // Costruzione Intestazione
   $("thead").innerHTML = `
     <tr>
       <th colspan="3">PRODOTTO</th>
@@ -270,7 +275,7 @@ function render() {
       <th colspan="2" class="grp-box">BOX</th>
       <th colspan="2" class="grp-sleeve">SLEEVE</th>
       <th class="grp-sfuso">SFUSO</th>
-      <th colspan="3">${isTotTab ? 'CONFRONTO GLOBALE' : 'TOTALE ' + warehouses[currentTab].toUpperCase()}</th>
+      <th colspan="3">${isTotTab ? 'CONFRONTO GLOBALE' : 'TOTALE ' + (warehouses[currentTab] || '').toUpperCase()}</th>
     </tr>
     <tr>
       <th>Codice</th><th>Prodotto</th><th>U.M.</th>
@@ -290,7 +295,6 @@ function render() {
     let boxQty = 0, sleeveQty = 0, sfusoQty = 0;
 
     if (isTotTab) {
-      // Somma i valori di tutti i magazzini per la vista Riepilogo
       warehouses.forEach((_, idx) => {
         const c = getCount(idx, r.code);
         boxQty += c.box;
@@ -360,4 +364,7 @@ function render() {
 
 function fmt(v) { return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3))); }
 function esc(v) { return text(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c])); }
-function showError(msg) { $("mainStatus").innerHTML = `<span style="color:#b00020;font-weight:bold">${esc(msg)}</span>`; }
+function showError(msg) { 
+  $("mainStatus").style.display = "block";
+  $("mainStatus").innerHTML = `<span style="color:#b00020;font-weight:bold">${esc(msg)}</span>`; 
+}
