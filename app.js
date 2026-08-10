@@ -364,14 +364,16 @@ function render() {
 
   if (currentActiveWhIdx === 'riepilogo') {
     renderRiepilogoView(container);
+    return;
+  }
+
+  const whName = warehouses[currentActiveWhIdx] || "";
+  
+  // Controllo sicuro e flessibile sul nome del magazzino caramelle
+  if (whName.toLowerCase().includes("caramelle") || whName.toLowerCase().includes("caramella")) {
+    renderCaramelleViewContainer(container, currentActiveWhIdx);
   } else {
-    const whName = warehouses[currentActiveWhIdx];
-    // Controllo robusto basato sul nome del magazzino corrente
-    if (whName && whName.toLowerCase().includes("caramelle")) {
-      renderCaramelleViewContainer(container, currentActiveWhIdx);
-    } else {
-      renderStandardWarehouseView(container, currentActiveWhIdx);
-    }
+    renderStandardWarehouseView(container, currentActiveWhIdx);
   }
 }
 
