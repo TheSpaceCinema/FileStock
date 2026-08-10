@@ -1,12 +1,26 @@
 let mag = [], size = [], rows = [];
+let cinemaName = "TSC Beinasco";
 let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
 let currentTab = 0; 
 let countsData = {}; 
+
+// Lista delle 36 sedi attuali
+const DEFAULT_CINEMAS = [
+  "TSC Beinasco", "TSC Belpasso", "TSC Bologna", "TSC Casamassima", "TSC Catanzaro",
+  "TSC Cerro Maggiore", "TSC Corciano", "TSC Firenze", "TSC Genova", "TSC Grosseto",
+  "TSC Guidonia", "Sede Piazza Augusto Imperatore", "TSC Lamezia Terme", "TSC Limena",
+  "TSC Livorno", "TSC Lugagnano", "TSC Montebello", "TSC Montesilvano", "TSC Napoli",
+  "TSC Nola", "TSC Parma Barilla", "TSC Parma Campus", "TSC Pradamano", "TSC Quartucciu",
+  "TSC Roma Moderno", "TSC Roma Parco de' Medici", "TSC Rozzano", "TSC Salerno",
+  "TSC Sestu", "TSC Silea", "TSC Surbo", "TSC Terni", "TSC Torino",
+  "TSC Torri di Quartesolo", "TSC Trieste", "TSC Vimercate"
+];
 
 const $ = id => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSetupFromStorage();
+  updateHeaderTitle();
 
   $("magFile").addEventListener("change", e => {
     const f = e.target.files[0];
@@ -44,16 +58,47 @@ function toggleFilesSection() {
   sec.style.display = (sec.style.display === "none") ? "grid" : "none";
 }
 
+function updateHeaderTitle() {
+  $("appTitle").textContent = `📊 Gestione Inventario — ${cinemaName}`;
+}
+
 /* ---------------- SETUP & STORAGE ---------------- */
 function loadSetupFromStorage() {
-  const saved = localStorage.getItem("cinema_warehouses");
-  if (saved) {
-    try { warehouses = JSON.parse(saved); } catch(e){}
+  const savedCinema = localStorage.getItem("cinema_info_name");
+  if (savedCinema) {
+    cinemaName = savedCinema;
+  }
+  const savedWh = localStorage.getItem("cinema_warehouses");
+  if (savedWh) {
+    try { warehouses = JSON.parse(savedWh); } catch(e){}
+  }
+}
+
+function handleCinemaSelectChange() {
+  const sel = $("cinemaSelect").value;
+  if (sel === "__CUSTOM__") {
+    $("customCinemaDiv").style.display = "block";
+  } else {
+    $("customCinemaDiv").style.display = "none";
   }
 }
 
 function saveWarehousesSetup() {
-  const inputs = document.querySelectorAll(".wh-input");
+  const sel = $("cinemaSelect").value;
+  if (sel === "__CUSTOM__") {
+    const customVal = $("customCinemaInput").value.trim();
+    if (!customVal) {
+      alert("Inserisci il nome della nuova sede!");
+      return;
+    }
+    cinemaName = customVal;
+  } else {
+    cinemaName = sel;
+  }
+
+  localStorage.setItem("cinema_info_name", cinemaName);
+
+  const inputs = document.querySelectorAll(".wh-input-item");
   const newWh = [];
   inputs.forEach(inp => {
     const val = inp.value.trim();
@@ -65,22 +110,55 @@ function saveWarehousesSetup() {
   }
   warehouses = newWh;
   localStorage.setItem("cinema_warehouses", JSON.stringify(warehouses));
+  
+  updateHeaderTitle();
   currentTab = 0;
-  renderTabs();
-  render();
+  switchTab();
 }
 
 function renderSetupView() {
   $("tabContent").style.display = "none";
   $("setupView").style.display = "block";
+  
+  // Popola il dropdown delle sedi
+  const select = $("cinemaSelect");
+  select.innerHTML = "";
+
+  let matched = false;
+  DEFAULT_CINEMAS.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    if (c === cinemaName) {
+      opt.selected = true;
+      matched = true;
+    }
+    select.appendChild(opt);
+  });
+
+  // Opzione per aggiunta personalizzata
+  const customOpt = document.createElement("option");
+  customOpt.value = "__CUSTOM__";
+  customOpt.textContent = "➕ Altro / Aggiungi nuovo cinema...";
+  if (!matched && cinemaName) {
+    customOpt.selected = true;
+    $("customCinemaDiv").style.display = "block";
+    $("customCinemaInput").value = cinemaName;
+  } else {
+    $("customCinemaDiv").style.display = "none";
+  }
+  select.appendChild(customOpt);
+  
+  // Popola la lista dei magazzini
   const container = $("whList");
   container.innerHTML = "";
   warehouses.forEach((w) => {
     const div = document.createElement("div");
     div.className = "wh-item";
+    div.style.cssText = "display: flex; gap: 10px; margin-bottom: 8px;";
     div.innerHTML = `
-      <input class="wh-input" value="${esc(w)}" placeholder="Nome Magazzino">
-      <button class="btn btn-danger" onclick="this.parentElement.remove()">Elimina</button>
+      <input class="wh-input-item" value="${esc(w)}" placeholder="Nome Magazzino" style="flex:1; padding: 6px 10px;">
+      <button class="btn btn-danger" onclick="this.parentElement.remove()" style="background:#d32f2f; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Elimina</button>
     `;
     container.appendChild(div);
   });
@@ -90,9 +168,10 @@ function addWarehouseInput() {
   const container = $("whList");
   const div = document.createElement("div");
   div.className = "wh-item";
+  div.style.cssText = "display: flex; gap: 10px; margin-bottom: 8px;";
   div.innerHTML = `
-    <input class="wh-input" value="Magazzino ${container.children.length + 1}" placeholder="Nome Magazzino">
-    <button class="btn btn-danger" onclick="this.parentElement.remove()">Elimina</button>
+    <input class="wh-input-item" value="Magazzino ${container.children.length + 1}" placeholder="Nome Magazzino" style="flex:1; padding: 6px 10px;">
+    <button class="btn btn-danger" onclick="this.parentElement.remove()" style="background:#d32f2f; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Elimina</button>
   `;
   container.appendChild(div);
 }
@@ -195,7 +274,6 @@ function parseMag(m) {
   return out;
 }
 
-// FIX PARSESIZE PER IL NUOVO FILE SENZA RIGHE VUOTE INIZIALI
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
@@ -360,6 +438,90 @@ function render() {
 
     $("tbody").appendChild(tr);
   });
+}
+
+/* ---------------- ESPORTAZIONE EXCEL ---------------- */
+function exportToExcel() {
+  if (!rows || rows.length === 0) {
+    alert("Nessun dato da esportare. Carica prima i file di magazzino.");
+    return;
+  }
+
+  if (typeof XLSX === "undefined") {
+    alert("Libreria XLSX non presente.");
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // --- FOGLIO 1: RIEPILOGO TOTALE ---
+  const totData = [
+    [`CINEMA / SEDE: ${cinemaName.toUpperCase()}`],
+    ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale", "Differenza Totale"]
+  ];
+
+  rows.forEach(r => {
+    let totBox = 0, totSleeve = 0, totSfuso = 0;
+    warehouses.forEach((_, idx) => {
+      const c = getCount(idx, r.code);
+      totBox += c.box;
+      totSleeve += c.sleeve;
+      totSfuso += c.sfuso;
+    });
+
+    const effettivoTot = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+    const diffTot = effettivoTot - r.atteso;
+
+    totData.push([
+      r.code,
+      r.name,
+      r.uom,
+      r.iniziale,
+      r.danni,
+      r.venduto,
+      r.atteso,
+      effettivoTot,
+      diffTot
+    ]);
+  });
+
+  const wsTot = XLSX.utils.aoa_to_sheet(totData);
+  XLSX.utils.book_append_sheet(wb, wsTot, "Riepilogo Totale");
+
+  // --- FOGLI PER SINGOLO MAGAZZINO ---
+  warehouses.forEach((whName, idx) => {
+    const whData = [
+      [`MAGAZZINO: ${whName.toUpperCase()} — SEDE: ${cinemaName.toUpperCase()}`],
+      ["Codice", "Prodotto", "U.M.", "Box Size", "Q.tà Box", "Sleeve Size", "Q.tà Sleeve", "Q.tà Sfuso", "Totale Rilevato (Pezzi)"]
+    ];
+
+    rows.forEach(r => {
+      const c = getCount(idx, r.code);
+      const effettivoWh = (c.box * r.boxSize) + (c.sleeve * r.sleeveSize) + c.sfuso;
+
+      whData.push([
+        r.code,
+        r.name,
+        r.uom,
+        r.boxSize || 0,
+        c.box,
+        r.sleeveSize || 0,
+        c.sleeve,
+        c.sfuso,
+        effettivoWh
+      ]);
+    });
+
+    const cleanSheetName = whName.replace(/[\\/?*:[\]]/g, "").substring(0, 31) || `Magazzino ${idx + 1}`;
+    const wsWh = XLSX.utils.aoa_to_sheet(whData);
+    XLSX.utils.book_append_sheet(wb, wsWh, cleanSheetName);
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+  const cleanCinemaName = cinemaName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const fileName = `Inventario_${cleanCinemaName}_${today}.xlsx`;
+
+  XLSX.writeFile(wb, fileName);
 }
 
 function fmt(v) { return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3))); }
