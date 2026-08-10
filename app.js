@@ -312,7 +312,7 @@ function parseMag(m) {
   return out;
 }
 
-/* PARSER SIZE ULTRA-TOLLERANTE */
+/* PARSER SIZE & KIT GESTIONALE */
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
@@ -327,48 +327,75 @@ function parseSize(m) {
   let codeCol = -1, pCol = -1, boxCol = -1, sleeveCol = -1;
   if (h >= 0) {
     const head = m[h];
-    codeCol = head.findIndex(v => {
-      const nV = norm(v);
-      return nV === "CODICE" || nV === "CODE" || nV.includes("ITEM") || nV.includes("ARTICOLO");
-    });
-    pCol = head.findIndex(v => {
-      const nV = norm(v);
-      return nV.includes("PRODOTTO") || nV.includes("DESCRIZIONE") || nV.includes("NOME") || nV.includes("NAME");
-    });
-    boxCol = head.findIndex(v => {
-      const nV = norm(v);
-      return nV.includes("BOX") || nV.includes("CARTONE") || nV.includes("CT") || nV.includes("COLLO");
-    });
-    sleeveCol = head.findIndex(v => {
-      const nV = norm(v);
-      return nV.includes("SLEEVE") || nV.includes("PACCO") || nV.includes("STECCA") || nV.includes("BLISTER");
-    });
+    codeCol = head.findIndex(v => { const nV = norm(v); return nV === "CODICE" || nV === "CODE" || nV.includes("ITEM") || nV.includes("ARTICOLO"); });
+    pCol = head.findIndex(v => { const nV = norm(v); return nV.includes("PRODOTTO") || nV.includes("DESCRIZIONE") || nV.includes("NOME") || nV.includes("NAME"); });
+    boxCol = head.findIndex(v => { const nV = norm(v); return nV.includes("BOX") || nV.includes("CARTONE") || nV.includes("CT") || nV.includes("COLLO"); });
+    sleeveCol = head.findIndex(v => { const nV = norm(v); return nV.includes("SLEEVE") || nV.includes("PACCO") || nV.includes("STECCA") || nV.includes("BLISTER"); });
   }
 
-  if (pCol < 0) pCol = (codeCol === 0) ? 1 : 0;
+  if (codeCol < 0) codeCol = 0;
+  if (pCol < 0) pCol = 1;
   if (boxCol < 0) boxCol = 2;
   if (sleeveCol < 0) sleeveCol = 3;
 
   const out = [];
-  const startRow = h >= 0 ? h + 1 : 0;
+  let isKitSection = false;
 
-  for (let i = startRow; i < m.length; i++) {
+  for (let i = (h >= 0 ? h + 1 : 0); i < m.length; i++) {
     const r = m[i];
     if (!r || !r.length) continue;
 
-    const rawCode = codeCol >= 0 ? text(r[codeCol]) : "";
-    const code = cleanCode(rawCode);
-    const name = text(r[pCol]);
+    const firstVal = text(r[0]);
+    const normFirst = norm(firstVal);
 
-    const normName = norm(name);
-    if ((!name && !code) || name === "#N/D" || normName.includes("PRODOTTO") || normName.includes("DESCRIZIONE")) continue;
+    if (normFirst === "KIT" || norm(r[1]) === "TIPO") {
+      isKitSection = true;
+      continue;
+    }
 
-    out.push({
-      code,
-      name,
-      boxSize: n(r[boxCol]),
-      sleeveSize: n(r[sleeveCol])
-    });
+    if (isKitSection) {
+      const kitName = firstVal;
+      const kitType = text(r[1]); 
+      if (!kitName) continue;
+
+      const ingredients = [];
+      for (let c = 2; c < r.length - 1; c += 2) {
+        const compName = text(r[c]);
+        let compQty = n(r[c + 1]);
+        if (compQty === 0 && c + 2 < r.length) {
+          compQty = n(r[c + 2]);
+        }
+        if (compName && compQty > 0) {
+          ingredients.push({ name: compName, qty: compQty });
+        }
+      }
+
+      out.push({
+        code: "KIT_" + cleanCode(kitName),
+        name: kitName,
+        boxSize: 1,
+        sleeveSize: 0,
+        isKit: true,
+        kitType,
+        ingredients
+      });
+    } else {
+      const rawCode = text(r[codeCol]);
+      const code = cleanCode(rawCode);
+      const name = text(r[pCol]);
+
+      const normName = norm(name);
+      if ((!name && !code) || name === "#N/D" || normName.includes("PRODOTTO") || normName.includes("DESCRIZIONE")) continue;
+
+      out.push({
+        code,
+        name,
+        boxSize: n(r[boxCol]),
+        sleeveSize: n(r[sleeveCol]),
+        isKit: false,
+        ingredients: []
+      });
+    }
   }
 
   if (out.length === 0) {
@@ -377,7 +404,7 @@ function parseSize(m) {
   return out;
 }
 
-/* BUILD E ACCOPPIAMENTO */
+/* BUILD E ORDINAMENTO KIT IN FONDO CON COLORE DIVERSO */
 function build() {
   if (!mag.length || !size.length) {
     $("mainStatus").style.display = "block";
@@ -399,8 +426,39 @@ function build() {
     return { 
       ...x, 
       boxSize: s.boxSize || 0, 
-      sleeveSize: s.sleeveSize || 0
+      sleeveSize: s.sleeveSize || 0,
+      isKit: s.isKit || norm(x.name).includes("KIT"),
+      ingredients: s.ingredients || []
     };
+  });
+
+  size.forEach(s => {
+    if (s.isKit) {
+      const exists = rows.some(r => norm(r.name) === norm(s.name));
+      if (!exists) {
+        rows.push({
+          rawCode: s.code,
+          code: s.code,
+          name: s.name,
+          uom: s.kitType || "BOX",
+          iniziale: 0,
+          danni: 0,
+          venduto: 0,
+          atteso: 0,
+          standardCost: 0,
+          boxSize: s.boxSize || 1,
+          sleeveSize: s.sleeveSize || 0,
+          isKit: true,
+          ingredients: s.ingredients || []
+        });
+      }
+    }
+  });
+
+  rows.sort((a, b) => {
+    if (a.isKit && !b.isKit) return 1;
+    if (!a.isKit && b.isKit) return -1;
+    return a.name.localeCompare(b.name);
   });
 
   $("filesSection").style.display = "none";
@@ -475,6 +533,12 @@ function render() {
 
   data.forEach(r => {
     const tr = document.createElement("tr");
+    
+    // Stile differenziato per i Kit (sfondo evidenziato in azzurro/blu chiaro)
+    if (r.isKit) {
+      tr.style.backgroundColor = "#e3f2fd";
+      tr.style.borderLeft = "4px solid #1976d2";
+    }
 
     const c = getCount(currentTab, r.code);
     const boxLocal = sumArr(c.box);
@@ -486,7 +550,7 @@ function render() {
     const diffValore = diffTotale * (r.standardCost || 0);
 
     tr.innerHTML = `
-      <td>${esc(r.name)}</td>
+      <td style="${r.isKit ? 'font-weight:bold; color:#0d47a1;' : ''}">${r.isKit ? '📦 ' : ''}${esc(r.name)}</td>
       <td>${esc(r.uom)}</td>
       <td class="num">${fmt(r.iniziale)}</td>
       <td class="num">${fmt(r.danni)}</td>
@@ -498,7 +562,7 @@ function render() {
       <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
       <td class="grp-sleeve">${isTotTab ? fmt(sleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve')}</td>
       
-      <td class="grp-sfuso">${isTotTab ? fmt(sfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
+      <td class="num grp-sfuso">${isTotTab ? fmt(sfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso')}</td>
       
       <td class="num">${fmt(r.atteso)}</td>
       <td class="num cell-eff" id="eff-${r.code}">${fmt(effettivoGlobale)}</td>
@@ -534,7 +598,6 @@ function renderMultiInput(whIdx, code, type) {
   return html;
 }
 
-/* RISOLUZIONE FOCUS E CALCOLO GLOBALE */
 function updateCountValue(whIdx, code, type, idx, inputEl) {
   const c = getCount(whIdx, code);
   const val = inputEl.value;
