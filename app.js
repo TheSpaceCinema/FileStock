@@ -667,18 +667,36 @@ function render() {
 function renderMultiInput(whIdx, code, type) {
   const c = getCount(whIdx, code);
   const arr = c[type];
+  
+  // Trova il prodotto per verificare i parametri di confezionamento dalla SIZE
+  const r = rows.find(x => x.code === code);
+  
+  // Verifica se il prodotto prevede box o sleeve secondo il file SIZE
+  let isDisabled = false;
+  if (r) {
+    if (type === 'box') {
+      isDisabled = !(r.boxSize && r.boxSize > 0);
+    } else if (type === 'sleeve') {
+      isDisabled = !(r.sleeveSize && r.sleeveSize > 0);
+    }
+  }
+
+  // Se non previsto, applichiamo gli attributi di disabilitazione e stile grigio
+  const disabledAttr = isDisabled ? 'disabled style="background-color: #e9ecef; color: #adb5bd; cursor: not-allowed;"' : '';
+
   let html = `<div class="input-scroll-cell" id="container-${code}-${type}">`;
 
   arr.forEach((val, idx) => {
-    html += `<input class="qty-input" type="number" step="any" min="0" value="${val || ''}" 
-              onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)"
-              onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
+    html += `<input class="qty-input" type="number" step="any" min="0" value="${val || ''}" ${disabledAttr}
+             onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)"
+             onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${idx}, this)">`;
   });
 
-  if (arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
+  // Se il campo è disabilitato, non mostriamo l'input aggiuntivo con il placeholder "+"
+  if (!isDisabled && arr.length < MAX_FIELDS && arr[arr.length - 1] > 0) {
     html += `<input class="qty-input" type="number" step="any" min="0" value="" placeholder="+" 
-              onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)"
-              onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)">`;
+             onkeyup="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)"
+             onchange="updateCountValue(${whIdx}, '${esc(code)}', '${type}', ${arr.length}, this)">`;
   }
 
   html += `</div>`;
