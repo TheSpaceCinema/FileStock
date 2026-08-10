@@ -313,6 +313,7 @@ function parseMag(m) {
 }
 
 /* PARSER SIZE & KIT CORRETTO */
+/* PARSER SIZE & KIT CORRETTO PER MULTI-COLONNA */
 function parseSize(m) {
   const out = [];
   let isKitSection = false;
@@ -335,6 +336,7 @@ function parseSize(m) {
       if (!kitName || normFirst === "PRODOTTO" || normFirst === "KIT") continue;
 
       const ingredients = [];
+      // Scorre tutte le colonne a partire da c = 2 in poi, prendendo a blocchi di 2 (prodotto e qtà)
       for (let c = 2; c < r.length - 1; c += 2) {
         const compName = text(r[c]);
         const compQty = n(r[c + 1]);
