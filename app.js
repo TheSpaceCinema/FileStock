@@ -255,10 +255,11 @@ function n(v) {
 }
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 
+/* PARSER MAGAZZINO DINAMICO ROBUSTO */
 function parseMag(m) {
   let headerRow = -1;
   
-  // 1. Cerca la riga di intestazione
+  // 1. Cerca la riga di intestazione del report
   for (let i = 0; i < m.length; i++) {
     if (!m[i]) continue;
     const rowStr = m[i].map(v => norm(v)).join(" ");
@@ -278,7 +279,7 @@ function parseMag(m) {
     const cellA = text(r[0]);
     const normA = norm(cellA);
 
-    // Salta righe di intestazione, totali o vuote
+    // Salta intestazioni, righe vuote o righe di totale
     if (!cellA || 
         normA.includes("STOCK LOCATION") || 
         normA.includes("STOCKTAKE") || 
@@ -291,26 +292,25 @@ function parseMag(m) {
       continue;
     }
 
-    // Se arriviamo qui, la riga i contiene il CODICE
+    // Codice trovato in colonna A
     const rawCode = cellA;
     const code = cleanCode(rawCode);
 
-    // Cerca il NOME del prodotto: di norma è nella riga SUBITO SOTTO (i+1) in colonna A
+    // Il NOME del prodotto risiede nella riga IMMEDIATAMENTE SOTTO (i+1) in Colonna A
     let name = "";
     if (i + 1 < m.length && m[i + 1]) {
       const nextCellA = text(m[i + 1][0]);
-      // Verifica che la riga sotto sia effettivamente una descrizione (e non un altro codice)
-      if (nextCellA && !/^\d+$/.test(nextCellA) && !norm(nextCellA).includes("TOTAL")) {
+      if (nextCellA && !norm(nextCellA).includes("TOTAL")) {
         name = nextCellA;
       }
     }
 
-    // Se non trova il nome sotto, verifica se per caso sta sulla stessa riga
+    // Fallback in caso di layout alternativi
     if (!name) {
       name = text(r[1]) || text(r[2]) || ("Prodotto " + code);
     }
 
-    // Mappatura colonne del report Stock Variance
+    // Mappatura esatta delle colonne di report Stock Variance
     const uom = text(r[2] || r[8] || "PZ");
     const iniziale = n(r[11]);
     const danni = n(r[16]);
@@ -322,7 +322,7 @@ function parseMag(m) {
       atteso = iniziale - danni - venduto;
     }
 
-    // Costo unitario (Std Cost)
+    // Costo Standard Unitario (colonna AG / index 32)
     const standardCost = Math.abs(n(r[32] || r[30] || 0));
 
     out.push({
@@ -339,11 +339,12 @@ function parseMag(m) {
   }
 
   if (out.length === 0) {
-    throw new Error("Nessun prodotto trovato. Verifica la struttura del file caricato.");
+    throw new Error("Nessun prodotto trovato. Assicurati che sia il file Stock Variance Report.");
   }
 
   return out;
 }
+
 function parseSize(m) {
   let h = -1;
   for (let i = 0; i < m.length; i++) {
@@ -586,7 +587,7 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   const diffTotale = effettivoGlobale - r.atteso;
   const diffValore = diffTotale * (r.standardCost || 0);
 
-  // Aggiornamento DOM al volo
+  // Aggiornamento DOM immediato
   const effEl = $(`eff-${code}`);
   const diffEl = $(`diff-${code}`);
   const valEl = $(`val-${code}`);
@@ -604,6 +605,7 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   saveCountsToStorage();
   recalcKPIs();
 }
+
 function recalcKPIs() {
   let totalAttesoPezzi = 0;
   let totalRilevatoPezzi = 0;
