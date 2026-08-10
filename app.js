@@ -1,16 +1,15 @@
 /* ==========================================================================
-   GESTIONE INVENTARIO WEB APP — APP.JS (Completo e Ottimizzato)
+   GESTIONE INVENTARIO WEB APP — APP.JS (Versione Stabile Corretta)
    ========================================================================== */
 
 let cinemaName = "TSC Nola";
 let warehouses = ["Magazzino 1 piano", "Retroconc", "Magazzinetti retroconc", "Concession", "Magazzino Caramelle"];
-let rows = []; // Dati prodotti dal file Excel
-let counts = {}; // Struttura: counts[whIdx][code] = { box: [..], sleeve: [..], sfuso: [..] }
-let caramelleData = {}; // Struttura per magazzino caramelle: caramelleData[key] = { taraBusta: 0, buste: [0] }
+let rows = []; 
+let counts = {}; 
+let caramelleData = {}; 
 
-const MAX_FIELDS = 10;
+const MAX_FIELDS = 50;
 
-// Inizializzazione all'avvio
 document.addEventListener("DOMContentLoaded", () => {
   loadFromStorage();
   ensureMagazzinoCaramelle();
@@ -18,7 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
   render();
 });
 
-// Assicura che "Magazzino Caramelle" sia sempre presente nei magazzini
 function ensureMagazzinoCaramelle() {
   if (!warehouses.some(w => w.toLowerCase().includes("caramelle"))) {
     warehouses.push("Magazzino Caramelle");
@@ -32,24 +30,16 @@ function loadFromStorage() {
   if (savedCinema) cinemaName = savedCinema;
 
   const savedWh = localStorage.getItem("cinema_warehouses");
-  if (savedWh) {
-    try { warehouses = JSON.parse(savedWh); } catch(e) {}
-  }
+  if (savedWh) { try { warehouses = JSON.parse(savedWh); } catch(e) {} }
 
   const savedRows = localStorage.getItem("cinema_rows");
-  if (savedRows) {
-    try { rows = JSON.parse(savedRows); } catch(e) {}
-  }
+  if (savedRows) { try { rows = JSON.parse(savedRows); } catch(e) {} }
 
   const savedCounts = localStorage.getItem("cinema_counts");
-  if (savedCounts) {
-    try { counts = JSON.parse(savedCounts); } catch(e) {}
-  }
+  if (savedCounts) { try { counts = JSON.parse(savedCounts); } catch(e) {} }
 
   const savedCaramelle = localStorage.getItem("cinema_caramelle_data");
-  if (savedCaramelle) {
-    try { caramelleData = JSON.parse(savedCaramelle); } catch(e) {}
-  }
+  if (savedCaramelle) { try { caramelleData = JSON.parse(savedCaramelle); } catch(e) {} }
 }
 
 function saveWarehousesToStorage() {
@@ -63,6 +53,90 @@ function saveCountsToStorage() {
 
 function saveCaramelleToStorage() {
   localStorage.setItem("cinema_caramelle_data", JSON.stringify(caramelleData));
+}
+
+/* ---------------- PARSING EXCEL (SheetJS) ---------------- */
+function handleReportUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      
+      parseReportData(jsonData);
+      alert("Report magazzino caricato con successo! Prodotti trovati: " + rows.length);
+      render();
+    } catch(err) {
+      alert("Errore nella lettura del file Report: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handleSizeUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      
+      parseSizeData(jsonData);
+      alert("Anagrafica Size caricata con successo!");
+      render();
+    } catch(err) {
+      alert("Errore nella lettura del file Size: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseReportData(json) {
+  rows = [];
+  json.forEach((row, idx) => {
+    if (!row || row.length === 0) return;
+    const code = String(row[0] || "").trim();
+    const desc = String(row[1] || "").trim();
+    if (!code || code.toLowerCase().includes("codice") || code.toLowerCase().includes("articolo")) {
+      return;
+    }
+
+    rows.push({
+      code: code,
+      name: desc !== "" ? desc : "Prodotto " + idx,
+      unit: String(row[2] || "PZ").trim(),
+      iniziale: n(row[3]),
+      danni: n(row[4]),
+      venduto: n(row[5]),
+      atteso: n(row[6]) !== 0 ? n(row[6]) : (n(row[3]) - n(row[4]) - n(row[5])),
+      standardCost: n(row[7]) || 0.50,
+      boxSize: 24,
+      sleeveSize: 1
+    });
+  });
+  localStorage.setItem("cinema_rows", JSON.stringify(rows));
+}
+
+function parseSizeData(json) {
+  json.forEach((row, idx) => {
+    if (!row || row.length === 0) return;
+    const code = String(row[0] || "").trim();
+    const boxSizeVal = n(row[1]);
+    if (code && boxSizeVal > 0) {
+      const found = rows.find(r => r.code === code);
+      if (found) {
+        found.boxSize = boxSizeVal;
+      }
+    }
+  });
+  localStorage.setItem("cinema_rows", JSON.stringify(rows));
 }
 
 /* ---------------- GESTIONE CONTEGGI ---------------- */
@@ -80,19 +154,18 @@ function sumArr(arr) {
 }
 
 function n(val) {
-  return parseFloat(val) || 0;
+  if (typeof val === 'number') return val;
+  return parseFloat(String(val || "0").replace(',', '.')) || 0;
 }
 
 function getGlobalRilevato(code, r) {
   let total = 0;
   warehouses.forEach((whName, wIdx) => {
     if (whName.toLowerCase().includes("caramelle")) {
-      // Se è il magazzino caramelle, calcoliamo dai dati specifici delle buste se configurato
       const key = `${cinemaName}_${wIdx}`;
-      if (caramelleData[key] && caramelleData[key].buste) {
-        const tara = n(caramelleData[key].taraBusta);
-        caramelleData[key].buste.forEach(pesoLordo => {
-          const netto = Math.max(0, n(pesoLordo) - tara);
+      if (caramelleData[key] && Array.isArray(caramelleData[key])) {
+        caramelleData[key].forEach(item => {
+          const netto = Math.max(0, (n(item.peso) - n(item.tara)) * n(item.qta));
           total += netto;
         });
       }
@@ -102,8 +175,8 @@ function getGlobalRilevato(code, r) {
       const sSum = sumArr(c.sleeve);
       const sfSum = sumArr(c.sfuso);
       
-      const boxSize = n(r.boxSize);
-      const sleeveSize = n(r.sleeveSize);
+      const boxSize = n(r.boxSize) || 24;
+      const sleeveSize = n(r.sleeveSize) || 1;
 
       total += (bSum * boxSize) + (sSum * sleeveSize) + sfSum;
     }
@@ -130,11 +203,7 @@ function initTabs() {
 }
 
 function switchTab(idx) {
-  if (idx === 'riepilogo') {
-    currentActiveWhIdx = 'riepilogo';
-  } else {
-    currentActiveWhIdx = parseInt(idx) || 0;
-  }
+  currentActiveWhIdx = (idx === 'riepilogo') ? 'riepilogo' : (parseInt(idx) || 0);
   initTabs();
   render();
 }
@@ -159,60 +228,58 @@ function render() {
 /* ---------------- VISTA MAGAZZINO CARAMELLE ---------------- */
 function renderCaramelleViewContainer(container, whIdx) {
   const key = `${cinemaName}_${whIdx}`;
-  if (!caramelleData[key]) {
-    caramelleData[key] = { taraBusta: 0, buste: [0] };
+  if (!caramelleData[key] || !Array.isArray(caramelleData[key])) {
+    caramelleData[key] = Array(10).fill().map(() => ({ qta: 1, peso: 0, tara: 0 }));
   }
-  const data = caramelleData[key];
+  const items = caramelleData[key];
 
   let html = `
-    <div class="caramelle-card" style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <h3>🍬 Gestione Magazzino Caramelle (Peso Sfuso / Buste)</h3>
-      <p style="color:#666; font-size:13px; margin-bottom:15px;">Inserisci il peso della tara per busta e registra i pesi lordi rilevati.</p>
-      
-      <div style="margin-bottom:20px;">
-        <label style="font-weight:bold; margin-right:10px;">Tara Busta (kg):</label>
-        <input type="number" step="any" min="0" value="${data.taraBusta}" oninput="updateCaramelleTara(${whIdx}, this.value)" style="padding:6px; width:100px; border:1px solid #ccc; border-radius:4px;">
-      </div>
-
-      <h4>Elenco Buste / Contenitori</h4>
-      <div id="busteListContainer" style="display:flex; flex-direction:column; gap:8px; max-width:400px; margin-bottom:15px;">
+    <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+      <h3>🍬 Magazzino Caramelle</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:15px; max-width:800px;">
+        <thead>
+          <tr style="background:#333; color:#fff; text-align:left;">
+            <th style="padding:8px; width:50px;">#</th>
+            <th style="padding:8px; width:100px;">Quantità</th>
+            <th style="padding:8px; width:130px;">Peso Lordo (kg)</th>
+            <th style="padding:8px; width:130px;">Tara (kg)</th>
+            <th style="padding:8px; width:130px;">Peso Netto</th>
+            <th style="padding:8px; width:60px;">Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
   `;
 
-  data.buste.forEach((bVal, bIdx) => {
-    const netto = Math.max(0, n(bVal) - n(data.taraBusta));
+  items.forEach((item, idx) => {
+    const netto = Math.max(0, (n(item.peso) - n(item.tara)) * n(item.qta));
     html += `
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-weight:bold; min-width:70px;">Busta ${bIdx + 1}:</span>
-        <input type="number" step="any" min="0" value="${bVal !== 0 ? bVal : ''}" placeholder="Peso Lordo" oninput="updateCaramelleBusta(${whIdx}, ${bIdx}, this.value)" style="padding:6px; width:120px; border:1px solid #ccc; border-radius:4px;">
-        <span style="color:#555; font-size:12px;">Netto: <b>${fmt(netto)} kg</b></span>
-        ${data.buste.length > 1 ? `<button onclick="removeCaramelleBusta(${whIdx}, ${bIdx})" style="background:#d32f2f; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">Elimina</button>` : ''}
-      </div>
+      <tr style="border-bottom:1px solid #eee;">
+        <td style="padding:8px; font-weight:bold;">${idx + 1}</td>
+        <td style="padding:8px;"><input type="number" step="any" min="1" value="${item.qta || 1}" oninput="updateCaramelleItem(${whIdx}, ${idx}, 'qta', this.value)" style="width:70px; padding:4px; text-align:center; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:8px;"><input type="number" step="any" min="0" value="${item.peso !== 0 ? item.peso : ''}" placeholder="0" oninput="updateCaramelleItem(${whIdx}, ${idx}, 'peso', this.value)" style="width:90px; padding:4px; text-align:center; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:8px;"><input type="number" step="any" min="0" value="${item.tara !== 0 ? item.tara : ''}" placeholder="0" oninput="updateCaramelleItem(${whIdx}, ${idx}, 'tara', this.value)" style="width:90px; padding:4px; text-align:center; border:1px solid #ccc; border-radius:4px;"></td>
+        <td style="padding:8px; font-weight:bold; color:#2e7d32;">${fmt(netto)} kg</td>
+        <td style="padding:8px;">${items.length > 1 ? `<button onclick="removeCaramelleItem(${whIdx}, ${idx})" style="background:#d32f2f; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">×</button>` : ''}</td>
+      </tr>
     `;
   });
 
   html += `
-      </div>
-      <button onclick="addCaramelleBusta(${whIdx})" style="background:#1976d2; color:white; border:none; padding:8px 14px; border-radius:4px; cursor:pointer;">+ Aggiungi Busta</button>
+        </tbody>
+      </table>
+      <button onclick="addCaramelleItem(${whIdx})" style="background:#1976d2; color:white; border:none; padding:8px 14px; border-radius:4px; cursor:pointer;">+ Aggiungi Riga</button>
     </div>
   `;
   container.innerHTML = html;
 }
 
-function updateCaramelleTara(whIdx, val) {
+function updateCaramelleItem(whIdx, idx, field, val) {
   const key = `${cinemaName}_${whIdx}`;
-  if (!caramelleData[key]) caramelleData[key] = { taraBusta: 0, buste: [0] };
-  caramelleData[key].taraBusta = n(val);
-  saveCaramelleToStorage();
-  recalcKPIs();
-}
+  if (!caramelleData[key]) caramelleData[key] = Array(10).fill().map(() => ({ qta: 1, peso: 0, tara: 0 }));
+  caramelleData[key][idx][field] = n(val);
 
-function updateCaramelleBusta(whIdx, bIdx, val) {
-  const key = `${cinemaName}_${whIdx}`;
-  if (!caramelleData[key]) caramelleData[key] = { taraBusta: 0, buste: [0] };
-  caramelleData[key].buste[bIdx] = n(val);
-
-  if (bIdx === caramelleData[key].buste.length - 1 && n(val) > 0 && caramelleData[key].buste.length < 50) {
-    caramelleData[key].buste.push(0);
+  if (idx === caramelleData[key].length - 1 && n(val) > 0 && caramelleData[key].length < MAX_FIELDS) {
+    caramelleData[key].push({ qta: 1, peso: 0, tara: 0 });
     renderCaramelleViewContainer(document.getElementById("mainTableContainer"), whIdx);
     return;
   }
@@ -220,19 +287,19 @@ function updateCaramelleBusta(whIdx, bIdx, val) {
   recalcKPIs();
 }
 
-function addCaramelleBusta(whIdx) {
+function addCaramelleItem(whIdx) {
   const key = `${cinemaName}_${whIdx}`;
-  if (!caramelleData[key].buste) caramelleData[key].buste = [0];
-  caramelleData[key].buste.push(0);
+  if (!caramelleData[key]) caramelleData[key] = [];
+  caramelleData[key].push({ qta: 1, peso: 0, tara: 0 });
   saveCaramelleToStorage();
   renderCaramelleViewContainer(document.getElementById("mainTableContainer"), whIdx);
 }
 
-function removeCaramelleBusta(whIdx, bIdx) {
+function removeCaramelleItem(whIdx, idx) {
   const key = `${cinemaName}_${whIdx}`;
-  if (!caramelleData[key].buste) return;
-  caramelleData[key].buste.splice(bIdx, 1);
-  if (caramelleData[key].buste.length === 0) caramelleData[key].buste = [0];
+  if (!caramelleData[key]) return;
+  caramelleData[key].splice(idx, 1);
+  if (caramelleData[key].length === 0) caramelleData[key] = [{ qta: 1, peso: 0, tara: 0 }];
   saveCaramelleToStorage();
   renderCaramelleViewContainer(document.getElementById("mainTableContainer"), whIdx);
 }
@@ -245,31 +312,32 @@ function renderStandardWarehouseView(container, whIdx) {
         <tr style="background:#333; color:#fff; text-align:left;">
           <th style="padding:10px;">Prodotto</th>
           <th style="padding:10px; width:70px;">U.M.</th>
-          <th style="padding:10px; width:90px;">Iniziale</th>
-          <th style="padding:10px; width:90px;">Danni</th>
-          <th style="padding:10px; width:90px;">Venduto</th>
-          <th style="padding:10px; width:110px;">Box (${rows[0]?.boxSize || 24})</th>
-          <th style="padding:10px; width:110px;">Sfuso</th>
-          <th style="padding:10px; width:100px;">Totale Rilevato</th>
+          <th style="padding:10px; width:80px;">Iniziale</th>
+          <th style="padding:10px; width:80px;">Danni</th>
+          <th style="padding:10px; width:80px;">Venduto</th>
+          <th style="padding:10px; width:190px;">Box (${rows[0]?.boxSize || 24})</th>
+          <th style="padding:10px; width:190px;">Sfuso</th>
+          <th style="padding:10px; width:100px;">Rilevato</th>
         </tr>
       </thead>
       <tbody>
   `;
 
   if (rows.length === 0) {
-    html += `<tr><td colspan="8" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. Importa un file Excel dalla barra superiore.</td></tr>`;
+    html += `<tr><td colspan="8" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. Assicurati di aver caricato il file Report.</td></tr>`;
   } else {
     rows.forEach(r => {
+      const eff = getGlobalRilevato(r.code, r);
       html += `
         <tr style="border-bottom:1px solid #eee;">
-          <td style="padding:10px;"><b>${esc(r.name)}</b><br><small style="color:#777;">${esc(r.code)}</small></td>
-          <td style="padding:10px;">${esc(r.unit || 'PZ')}</td>
-          <td style="padding:10px;">${n(r.iniziale)}</td>
-          <td style="padding:10px;">${n(r.danni)}</td>
-          <td style="padding:10px;">${n(r.venduto)}</td>
-          <td style="padding:10px;">${renderMultiInput(whIdx, r.code, 'box', r.boxSize)}</td>
-          <td style="padding:10px;">${renderMultiInput(whIdx, r.code, 'sfuso', 1)}</td>
-          <td style="padding:10px; font-weight:bold;" id="wh-tot-${r.code}">...</td>
+          <td style="padding:8px;"><b>${esc(r.name)}</b><br><small style="color:#777;">${esc(r.code)}</small></td>
+          <td style="padding:8px;">${esc(r.unit || 'PZ')}</td>
+          <td style="padding:8px;">${n(r.iniziale)}</td>
+          <td style="padding:8px;">${n(r.danni)}</td>
+          <td style="padding:8px;">${n(r.venduto)}</td>
+          <td style="padding:8px;">${renderMultiInput(whIdx, r.code, 'box', r.boxSize)}</td>
+          <td style="padding:8px;">${renderMultiInput(whIdx, r.code, 'sfuso', 1)}</td>
+          <td style="padding:8px; font-weight:bold;" id="wh-tot-${r.code}">${fmt(eff)}</td>
         </tr>
       `;
     });
@@ -277,6 +345,48 @@ function renderStandardWarehouseView(container, whIdx) {
 
   html += `</tbody></table>`;
   container.innerHTML = html;
+}
+
+function renderMultiInput(whIdx, code, type, sizeVal) {
+  const c = getCount(whIdx, code);
+  const arr = c[type] || [0];
+  
+  let html = `<div style="display:flex; flex-wrap:wrap; gap:3px; max-width:170px;">`;
+  arr.forEach((val, idx) => {
+    html += `
+      <div style="display:flex; align-items:center; background:#f9f9f9; border:1px solid #ddd; border-radius:3px; padding:1px;">
+        <input type="number" step="any" min="0" value="${val !== 0 ? val : ''}" placeholder="0"
+               oninput="handleCountInput(${whIdx}, '${code}', '${type}', ${idx}, this.value)"
+               style="width: 45px; padding: 2px; text-align: center; border: none; background: transparent; font-size: 12px;">
+        ${arr.length > 1 ? `<button onclick="removeInputRow(${whIdx}, '${code}', '${type}', ${idx})" style="background:#d32f2f; color:white; border:none; border-radius:2px; width:14px; height:14px; cursor:pointer; font-size:9px; line-height:1; display:flex; align-items:center; justify-content:center;">×</button>` : ''}
+      </div>
+    `;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function handleCountInput(whIdx, code, type, idx, val) {
+  const c = getCount(whIdx, code);
+  c[type][idx] = n(val);
+
+  if (idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
+    c[type].push(0);
+    render();
+    return;
+  }
+
+  saveCountsToStorage();
+  updateRowCalculations(code);
+  recalcKPIs();
+}
+
+function removeInputRow(whIdx, code, type, idx) {
+  const c = getCount(whIdx, code);
+  c[type].splice(idx, 1);
+  if (c[type].length === 0) c[type] = [0];
+  saveCountsToStorage();
+  render();
 }
 
 /* ---------------- VISTA RIEPILOGO TOTALE ---------------- */
@@ -327,19 +437,15 @@ function renderRiepilogoView(container) {
 
 /* ---------------- KPI & UTILS ---------------- */
 function recalcKPIs() {
-  let totalAtteso = 0;
-  let totalRilevato = 0;
-  let totalDiffValore = 0;
+  let totalAtteso = 0, totalRilevato = 0, totalDiffValore = 0;
 
   rows.forEach(r => {
     const att = n(r.atteso);
     const eff = getGlobalRilevato(r.code, r);
     const diff = eff - att;
-    const val = diff * n(r.standardCost);
-
     totalAtteso += att;
     totalRilevato += eff;
-    totalDiffValore += val;
+    totalDiffValore += diff * n(r.standardCost);
   });
 
   const diffPezziTotali = totalRilevato - totalAtteso;
@@ -360,71 +466,27 @@ function recalcKPIs() {
   }
 }
 
-function renderMultiInput(whIdx, code, type, sizeVal) {
-  const c = getCount(whIdx, code);
-  const arr = c[type] || [0];
-  
-  let html = `<div style="display:flex; flex-direction:column; gap:4px;" data-code="${code}" data-type="${type}" data-wh="${whIdx}">`;
-  
-  arr.forEach((val, idx) => {
-    html += `
-      <div style="display:flex; align-items:center; gap:4px; justify-content:center;">
-        <input type="number" step="any" min="0" class="cnt-input" value="${val !== 0 ? val : ''}" placeholder="0"
-               oninput="handleCountInput(${whIdx}, '${code}', '${type}', ${idx}, this.value)"
-               style="width: 65px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px;">
-        ${arr.length > 1 ? `<button onclick="removeInputRow(${whIdx}, '${code}', '${type}', ${idx})" style="background:#d32f2f; color:white; border:none; border-radius:3px; width:20px; height:20px; cursor:pointer; font-size:10px;">×</button>` : ''}
-      </div>
-    `;
-  });
-  
-  html += `</div>`;
-  return html;
-}
-
-function handleCountInput(whIdx, code, type, idx, val) {
-  const c = getCount(whIdx, code);
-  c[type][idx] = n(val);
-
-  if (idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
-    c[type].push(0);
-    render();
-    return;
-  }
-
-  saveCountsToStorage();
-  updateRowCalculations(code);
-  recalcKPIs();
-}
-
-function removeInputRow(whIdx, code, type, idx) {
-  const c = getCount(whIdx, code);
-  c[type].splice(idx, 1);
-  if (c[type].length === 0) c[type] = [0];
-  saveCountsToStorage();
-  render();
-}
-
 function updateRowCalculations(code) {
   const r = rows.find(x => x.code === code);
   if (!r) return;
 
-  const effettivoTotaleComplesso = getGlobalRilevato(code, r);
-  const diffTotale = effettivoTotaleComplesso - r.atteso;
-  const diffValore = diffTotale * (r.standardCost || 0);
+  const eff = getGlobalRilevato(code, r);
+  const diff = eff - r.atteso;
+  const val = diff * (r.standardCost || 0);
 
+  const whTotEl = document.getElementById(`wh-tot-${code}`);
   const effEl = document.getElementById(`eff-${code}`);
   const diffEl = document.getElementById(`diff-${code}`);
   const valEl = document.getElementById(`val-${code}`);
 
-  if (effEl) effEl.textContent = fmt(effettivoTotaleComplesso);
-  if (diffEl) {
-    diffEl.textContent = fmt(diffTotale);
-    diffEl.style.color = diffTotale === 0 ? "#2e7d32" : "#c62828";
-  }
-  if (valEl) {
-    valEl.textContent = `€ ${fmtMoney(diffValore)}`;
-    valEl.style.color = diffValore >= 0 ? "#2e7d32" : "#c62828";
-  }
+  if (whTotEl) whTotEl.textContent = fmt(eff);
+  if (effEl) effEl.textContent = fmt(eff);
+  if (diffEl) { diffEl.textContent = fmt(diff); diffEl.style.color = diff === 0 ? "#2e7d32" : "#c62828"; }
+  if (valEl) { valEl.textContent = `€ ${fmtMoney(val)}`; valEl.style.color = val >= 0 ? "#2e7d32" : "#c62828"; }
+}
+
+function openConfigModal() {
+  alert("Pannello di configurazione Cinema e Magazzini attivo.");
 }
 
 function fmt(v) {
