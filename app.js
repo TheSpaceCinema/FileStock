@@ -473,18 +473,27 @@ function getCount(whIdx, code) {
 
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
-/* CONTRIBUTO KIT FLESSIBILE */
+/* CONTRIBUTO KIT SUPER ROBUSTO (PULIZIA TOTALE SPAZI E FORMATTI) */
 function getKitContributionDetail(productName, productCode) {
   let kitContribution = 0;
-  const normProdName = norm(productName);
-  const normProdCode = norm(productCode);
+  
+  // Normalizzazione aggressiva: rimuove tutti gli spazi, i simboli e porta tutto in maiuscolo
+  const cleanStr = (str) => norm(str).replace(/[^A-Z0-9]/g, "");
+  
+  const normProdName = cleanStr(productName);
+  const normProdCode = cleanCode(productCode);
 
   rows.forEach(rowItem => {
     if (rowItem.isKit && rowItem.ingredients && rowItem.ingredients.length > 0) {
       rowItem.ingredients.forEach(ing => {
-        const normIngName = norm(ing.name);
+        const normIngName = cleanStr(ing.name);
+        const normIngCode = cleanCode(ing.code);
         
-        if (normProdName.includes(normIngName) || normIngName.includes(normProdName) || (productCode && normProdCode === norm(ing.code))) {
+        // Cerca corrispondenza esatta dei codici oppure inclusione dei nomi ripuliti da spazi e simboli
+        const matchCode = (normProdCode && normIngCode && normProdCode === normIngCode);
+        const matchName = (normProdName.includes(normIngName) || normIngName.includes(normProdName));
+
+        if (matchCode || matchName) {
           warehouses.forEach((_, wIdx) => {
             const kitCounts = getCount(wIdx, rowItem.code);
             const kitBoxTot = sumArr(kitCounts.box);
@@ -501,7 +510,6 @@ function getKitContributionDetail(productName, productCode) {
 
   return kitContribution;
 }
-
 function getGlobalRilevato(code, r) {
   let totBox = 0, totSleeve = 0, totSfuso = 0;
   warehouses.forEach((_, idx) => {
