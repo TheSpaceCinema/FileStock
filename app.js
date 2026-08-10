@@ -554,6 +554,7 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   const r = rows.find(x => x.code === code);
   if (!r) return;
 
+  // Gestione dinamica aggiunta campi input
   const container = $(`container-${code}-${type}`);
   if (container && idx === c[type].length - 1 && n(val) > 0 && c[type].length < MAX_FIELDS) {
     const newInput = document.createElement("input");
@@ -568,10 +569,12 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
     container.appendChild(newInput);
   }
 
+  // Ricalcolo immediato dei totali per questa riga
   const effettivoGlobale = getGlobalRilevato(code, r);
   const diffTotale = effettivoGlobale - r.atteso;
   const diffValore = diffTotale * (r.standardCost || 0);
 
+  // Aggiornamento DOM al volo
   const effEl = $(`eff-${code}`);
   const diffEl = $(`diff-${code}`);
   const valEl = $(`val-${code}`);
@@ -589,7 +592,6 @@ function updateCountValue(whIdx, code, type, idx, inputEl) {
   saveCountsToStorage();
   recalcKPIs();
 }
-
 function recalcKPIs() {
   let totalAttesoPezzi = 0;
   let totalRilevatoPezzi = 0;
