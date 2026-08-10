@@ -312,8 +312,7 @@ function parseMag(m) {
   return out;
 }
 
-/* PARSER SIZE & KIT CORRETTO */
-/* PARSER SIZE & KIT CORRETTO PER MULTI-COLONNA */
+/* PARSER SIZE & KIT ULTRA-ROBUSTO (SCANSIONE DINAMICA DI TUTTA LA RIGA) */
 function parseSize(m) {
   const out = [];
   let isKitSection = false;
@@ -336,12 +335,24 @@ function parseSize(m) {
       if (!kitName || normFirst === "PRODOTTO" || normFirst === "KIT") continue;
 
       const ingredients = [];
-      // Scorre tutte le colonne a partire da c = 2 in poi, prendendo a blocchi di 2 (prodotto e qtà)
-      for (let c = 2; c < r.length - 1; c += 2) {
-        const compName = text(r[c]);
-        const compQty = n(r[c + 1]);
-        if (compName && compQty > 0) {
-          ingredients.push({ name: compName, qty: compQty });
+      let currentIngName = "";
+
+      for (let c = 2; c < r.length; c++) {
+        const val = r[c];
+        if (val === null || val === undefined || String(val).trim() === "") continue;
+        
+        // Verifica se il valore è numerico (quantità)
+        const numericVal = Number(val);
+        if (!isNaN(numericVal) && typeof val !== "string" && !isNaN(parseFloat(val))) {
+          if (currentIngName && numericVal > 0) {
+            ingredients.push({ name: currentIngName, qty: numericVal });
+            currentIngName = ""; 
+          }
+        } else {
+          const textVal = text(val);
+          if (norm(textVal) !== "PRODOTTO" && norm(textVal) !== "Q.TA") {
+            currentIngName = textVal;
+          }
         }
       }
 
@@ -388,6 +399,43 @@ function parseSize(m) {
     throw new Error("Nessuna anagrafica SIZE trovata nel file inserito.");
   }
   return out;
+}
+
+/* CONTRIBUTO KIT SUPER ROBUSTO (PULIZIA TOTALE SPAZI E FORMATTI) */
+function getKitContributionDetail(productName, productCode) {
+  let kitContribution = 0;
+  
+  // Normalizzazione aggressiva: rimuove tutti gli spazi, i simboli e porta tutto in maiuscolo
+  const cleanStr = (str) => norm(str).replace(/[^A-Z0-9]/g, "");
+  
+  const normProdName = cleanStr(productName);
+  const normProdCode = cleanCode(productCode);
+
+  rows.forEach(rowItem => {
+    if (rowItem.isKit && rowItem.ingredients && rowItem.ingredients.length > 0) {
+      rowItem.ingredients.forEach(ing => {
+        const normIngName = cleanStr(ing.name);
+        const normIngCode = cleanCode(ing.code);
+        
+        const matchCode = (normProdCode && normIngCode && normProdCode === normIngCode);
+        const matchName = (normProdName.includes(normIngName) || normIngName.includes(normProdName));
+
+        if (matchCode || matchName) {
+          warehouses.forEach((_, wIdx) => {
+            const kitCounts = getCount(wIdx, rowItem.code);
+            const kitBoxTot = sumArr(kitCounts.box);
+            const kitSleeveTot = sumArr(kitCounts.sleeve);
+            const kitSfusoTot = sumArr(kitCounts.sfuso);
+            const kitTotalPezzi = (kitBoxTot * rowItem.boxSize) + (kitSleeveTot * rowItem.sleeveSize) + kitSfusoTot;
+            
+            kitContribution += kitTotalPezzi * ing.qty;
+          });
+        }
+      });
+    }
+  });
+
+  return kitContribution;
 }
 
 /* BUILD E ORDINAMENTO KIT IN FONDO */
