@@ -1,16 +1,15 @@
 /* ==========================================================================
-   GESTIONE INVENTARIO WEB APP — APP.JS (Corretto e Definitivo)
+   GESTIONE INVENTARIO WEB APP — APP.JS (Fix Definitivo Caricamento XLS/XLSX)
    ========================================================================== */
 
 let cinemaName = "TSC Nola";
 let warehouses = ["Magazzino 1 piano", "Retroconc", "Magazzinetti retroconc", "Concession", "Magazzino Caramelle"];
-let rows = []; // Dati prodotti dal file Excel
-let counts = {}; // Struttura: counts[whIdx][code] = { box: [..], sleeve: [..], sfuso: [..] }
-let caramelleData = {}; // Struttura caramelle: caramelleData[key] = [ { qta: 1, peso: 0, tara: 0 }, ... ]
+let rows = []; 
+let counts = {}; 
+let caramelleData = {}; 
 
 const MAX_FIELDS = 50;
 
-// Inizializzazione all'avvio
 document.addEventListener("DOMContentLoaded", () => {
   loadFromStorage();
   ensureMagazzinoCaramelle();
@@ -19,7 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
   render();
 });
 
-// Funzioni richiamate direttamente dall'HTML (pulsanti in alto)
 window.renderSetupView = function() {
   openConfigModal();
 };
@@ -28,7 +26,6 @@ window.toggleFilesSection = function() {
   renderUploadScreen();
 };
 
-// Collega i pulsanti in alto se usano selettori dinamici o attributi inline
 function initTopButtons() {
   const buttons = document.querySelectorAll("header button, .top-bar button, button");
   buttons.forEach(btn => {
@@ -36,13 +33,9 @@ function initTopButtons() {
     if (text.includes("Configura")) {
       btn.onclick = () => openConfigModal();
     } else if (text.includes("Carica") || text.includes("File")) {
-      btn.onclick = () => toggleUploadSection();
+      btn.onclick = () => renderUploadScreen();
     }
   });
-}
-
-function toggleUploadSection() {
-  renderUploadScreen();
 }
 
 function renderUploadScreen() {
@@ -51,17 +44,17 @@ function renderUploadScreen() {
 
   container.innerHTML = `
     <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); max-width:800px; margin: 20px auto;">
-      <h3>📁 Caricamento File Excel</h3>
-      <p style="color:#666; font-size:13px; margin-bottom:20px;">Carica il report di magazzino e l'anagrafica SIZE per popolare i dati.</p>
+      <h3>📁 Caricamento File Report & Size</h3>
+      <p style="color:#666; font-size:13px; margin-bottom:20px;">Seleziona i file Excel (.xls / .xlsx) esportati dal gestionale.</p>
       
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
         <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
           <h4>1. Report Magazzino</h4>
-          <input type="file" id="fileReport" accept=".xlsx, .xls" onchange="handleReportUpload(event)" style="margin-top:10px;">
+          <input type="file" id="fileReport" accept=".xlsx, .xls, .XLS" onchange="handleReportUpload(event)" style="margin-top:10px;">
         </div>
         <div style="border: 2px dashed #ccc; padding: 15px; border-radius: 6px; text-align: center;">
           <h4>2. Anagrafica SIZE</h4>
-          <input type="file" id="fileSize" accept=".xlsx, .xls" onchange="handleSizeUpload(event)" style="margin-top:10px;">
+          <input type="file" id="fileSize" accept=".xlsx, .xls, .XLS" onchange="handleSizeUpload(event)" style="margin-top:10px;">
         </div>
       </div>
       <button onclick="render()" style="background:#333; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Torna all'Inventario</button>
@@ -82,24 +75,16 @@ function loadFromStorage() {
   if (savedCinema) cinemaName = savedCinema;
 
   const savedWh = localStorage.getItem("cinema_warehouses");
-  if (savedWh) {
-    try { warehouses = JSON.parse(savedWh); } catch(e) {}
-  }
+  if (savedWh) { try { warehouses = JSON.parse(savedWh); } catch(e) {} }
 
   const savedRows = localStorage.getItem("cinema_rows");
-  if (savedRows) {
-    try { rows = JSON.parse(savedRows); } catch(e) {}
-  }
+  if (savedRows) { try { rows = JSON.parse(savedRows); } catch(e) {} }
 
   const savedCounts = localStorage.getItem("cinema_counts");
-  if (savedCounts) {
-    try { counts = JSON.parse(savedCounts); } catch(e) {}
-  }
+  if (savedCounts) { try { counts = JSON.parse(savedCounts); } catch(e) {} }
 
   const savedCaramelle = localStorage.getItem("cinema_caramelle_data");
-  if (savedCaramelle) {
-    try { caramelleData = JSON.parse(savedCaramelle); } catch(e) {}
-  }
+  if (savedCaramelle) { try { caramelleData = JSON.parse(savedCaramelle); } catch(e) {} }
 }
 
 function saveWarehousesToStorage() {
@@ -115,22 +100,25 @@ function saveCaramelleToStorage() {
   localStorage.setItem("cinema_caramelle_data", JSON.stringify(caramelleData));
 }
 
-/* ---------------- PARSING EXCEL (SheetJS) ---------------- */
+/* ---------------- PARSING EXCEL ROBUSTO (XLS / XLSX) ---------------- */
 function handleReportUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
+  
   reader.onload = function(evt) {
     try {
       const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
       
       parseReportData(jsonData);
-      alert("Report magazzino caricato con successo!");
+      alert(`Report caricato con successo! Prodotti trovati: ${rows.length}`);
       render();
     } catch(err) {
+      console.error(err);
       alert("Errore nella lettura del file Report: " + err.message);
     }
   };
@@ -141,17 +129,20 @@ function handleSizeUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
+  
   reader.onload = function(evt) {
     try {
       const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
       
       parseSizeData(jsonData);
       alert("Anagrafica Size caricata con successo!");
       render();
     } catch(err) {
+      console.error(err);
       alert("Errore nella lettura del file Size: " + err.message);
     }
   };
@@ -160,39 +151,73 @@ function handleSizeUpload(e) {
 
 function parseReportData(json) {
   rows = [];
-  json.forEach((row, idx) => {
-    if (idx === 0) return;
-    if (row[0]) {
-      rows.push({
-        code: String(row[0] || idx),
-        name: String(row[1] || "Prodotto " + idx),
-        unit: String(row[2] || "PZ"),
-        iniziale: n(row[3]),
-        danni: n(row[4]),
-        venduto: n(row[5]),
-        atteso: n(row[6]) || (n(row[3]) - n(row[4]) - n(row[5])),
-        standardCost: n(row[7]) || 0.50,
-        boxSize: 24,
-        sleeveSize: 1
-      });
+  // Cerca la riga di intestazione o parte dalla seconda riga (indice 1) saltando eventuali titoli iniziali vuoti
+  let startIndex = 0;
+  for (let i = 0; i < json.length; i++) {
+    const row = json[i];
+    // Se troviamo una riga con almeno un codice o testo descrittivo plausibile
+    if (row && row.length > 0 && (String(row[0]).trim() !== "" || String(row[1]).trim() !== "")) {
+      // Controlliamo se è l'intestazione (es. contiene la parola codice o descrizione)
+      const rowStr = row.join(" ").toLowerCase();
+      if (rowStr.includes("codice") || rowStr.includes("articolo") || rowStr.includes("descrizione")) {
+        startIndex = i + 1;
+        break;
+      }
     }
-  });
+  }
+
+  // Se non ha trovato un'intestazione esplicita, parte dalla prima riga utile o dalla seconda
+  if (startIndex === 0 && json.length > 1) startIndex = 1;
+
+  for (let i = startIndex; i < json.length; i++) {
+    const r = json[i];
+    if (!r || r.length === 0) continue;
+    
+    // Mappatura flessibile delle colonne: Cerca codice nella colonna 0 o 1
+    const code = String(r[0] !== undefined && r[0] !== "" ? r[0] : (r[1] || "")).trim();
+    if (!code) continue; // Salta righe vuote
+
+    const name = String(r[1] !== undefined && r[1] !== "" ? r[1] : (r[2] || "Prodotto " + i)).trim();
+    const unit = String(r[2] || r[3] || "PZ").trim();
+    
+    const iniziale = n(r[3] ?? r[4]);
+    const danni = n(r[4] ?? r[5]);
+    const venduto = n(r[5] ?? r[6]);
+    const attesoCol = r[6] !== undefined ? n(r[6]) : (n(r[3]) - n(r[4]) - n(r[5]));
+
+    rows.push({
+      code: code,
+      name: name !== "" ? name : "Prodotto " + code,
+      unit: unit !== "" ? unit : "PZ",
+      iniziale: iniziale,
+      danni: danni,
+      venduto: venduto,
+      atteso: attesoCol || (iniziale - danni - venduto),
+      standardCost: n(r[7]) || 0.50,
+      boxSize: 24,
+      sleeveSize: 1
+    });
+  }
+
   localStorage.setItem("cinema_rows", JSON.stringify(rows));
 }
 
 function parseSizeData(json) {
-  json.forEach((row, idx) => {
+  json.forEach((r, idx) => {
     if (idx === 0) return;
-    const code = String(row[0] || "");
-    const found = rows.find(r => r.code === code);
-    if (found) {
-      found.boxSize = n(row[1]) || 24;
+    const code = String(r[0] || "").trim();
+    const boxSizeVal = n(r[1] || r[2]);
+    if (code && boxSizeVal > 0) {
+      const found = rows.find(x => x.code === code);
+      if (found) {
+        found.boxSize = boxSizeVal;
+      }
     }
   });
   localStorage.setItem("cinema_rows", JSON.stringify(rows));
 }
 
-/* ---------------- GESTIONE CONTEGGI ---------------- */
+/* ---------------- GESTIONE CONTEGGI & TAB ---------------- */
 function getCount(whIdx, code) {
   if (!counts[whIdx]) counts[whIdx] = {};
   if (!counts[whIdx][code]) {
@@ -207,7 +232,8 @@ function sumArr(arr) {
 }
 
 function n(val) {
-  return parseFloat(val) || 0;
+  if (typeof val === 'number') return val;
+  return parseFloat(String(val || "0").replace(',', '.')) || 0;
 }
 
 function getGlobalRilevato(code, r) {
@@ -227,16 +253,12 @@ function getGlobalRilevato(code, r) {
       const sSum = sumArr(c.sleeve);
       const sfSum = sumArr(c.sfuso);
       
-      const boxSize = n(r.boxSize);
-      const sleeveSize = n(r.sleeveSize);
-
-      total += (bSum * boxSize) + (sSum * sleeveSize) + sfSum;
+      total += (bSum * n(r.boxSize)) + (sSum * n(r.sleeveSize)) + sfSum;
     }
   });
   return total;
 }
 
-/* ---------------- UI & RENDERING TAB ---------------- */
 let currentActiveWhIdx = 0;
 
 function initTabs() {
@@ -255,11 +277,7 @@ function initTabs() {
 }
 
 function switchTab(idx) {
-  if (idx === 'riepilogo') {
-    currentActiveWhIdx = 'riepilogo';
-  } else {
-    currentActiveWhIdx = parseInt(idx) || 0;
-  }
+  currentActiveWhIdx = (idx === 'riepilogo') ? 'riepilogo' : (parseInt(idx) || 0);
   initTabs();
   render();
 }
@@ -281,7 +299,6 @@ function render() {
   }
 }
 
-/* ---------------- VISTA MAGAZZINO CARAMELLE ---------------- */
 function renderCaramelleViewContainer(container, whIdx) {
   const key = `${cinemaName}_${whIdx}`;
   if (!caramelleData[key] || !Array.isArray(caramelleData[key])) {
@@ -291,9 +308,7 @@ function renderCaramelleViewContainer(container, whIdx) {
 
   let html = `
     <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <h3>🍬 Gestione Magazzino Caramelle (Quantità, Peso e Tara per Riga)</h3>
-      <p style="color:#666; font-size:13px; margin-bottom:15px;">Inserisci quantità, peso lordo e tara per ciascuna riga. Verranno aggiunte nuove righe automaticamente una volta compilata la decima.</p>
-      
+      <h3>🍬 Magazzino Caramelle</h3>
       <table style="width:100%; border-collapse:collapse; margin-bottom:15px; max-width:800px;">
         <thead>
           <tr style="background:#333; color:#fff; text-align:left;">
@@ -362,7 +377,6 @@ function removeCaramelleItem(whIdx, idx) {
   renderCaramelleViewContainer(document.getElementById("mainTableContainer"), whIdx);
 }
 
-/* ---------------- VISTA MAGAZZINO STANDARD ---------------- */
 function renderStandardWarehouseView(container, whIdx) {
   let html = `
     <table class="inventory-table" style="width:100%; border-collapse:collapse; background:#fff;">
@@ -382,7 +396,7 @@ function renderStandardWarehouseView(container, whIdx) {
   `;
 
   if (rows.length === 0) {
-    html += `<tr><td colspan="8" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. <button onclick="renderUploadScreen()" style="background:#1976d2; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Carica File Excel</button></td></tr>`;
+    html += `<tr><td colspan="8" style="padding:20px; text-align:center; color:#777;">Nessun prodotto trovato nel file. Assicurati che il file Excel contenga dati validi. <br><br><button onclick="renderUploadScreen()" style="background:#1976d2; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Ricarica File</button></td></tr>`;
   } else {
     rows.forEach(r => {
       const eff = getGlobalRilevato(r.code, r);
@@ -409,19 +423,17 @@ function renderMultiInput(whIdx, code, type, sizeVal) {
   const c = getCount(whIdx, code);
   const arr = c[type] || [0];
   
-  let html = `<div style="display:flex; flex-wrap:wrap; gap:3px; max-width:170px;" data-code="${code}" data-type="${type}" data-wh="${whIdx}">`;
-  
+  let html = `<div style="display:flex; flex-wrap:wrap; gap:3px; max-width:170px;">`;
   arr.forEach((val, idx) => {
     html += `
-      <div style="display:flex; align-items:center; background:#f9f9f9; border:1px solid #ddd; border-radius:3px; padding:1px; position:relative;">
-        <input type="number" step="any" min="0" class="cnt-input" value="${val !== 0 ? val : ''}" placeholder="0"
+      <div style="display:flex; align-items:center; background:#f9f9f9; border:1px solid #ddd; border-radius:3px; padding:1px;">
+        <input type="number" step="any" min="0" value="${val !== 0 ? val : ''}" placeholder="0"
                oninput="handleCountInput(${whIdx}, '${code}', '${type}', ${idx}, this.value)"
                style="width: 45px; padding: 2px; text-align: center; border: none; background: transparent; font-size: 12px;">
         ${arr.length > 1 ? `<button onclick="removeInputRow(${whIdx}, '${code}', '${type}', ${idx})" style="background:#d32f2f; color:white; border:none; border-radius:2px; width:14px; height:14px; cursor:pointer; font-size:9px; line-height:1; display:flex; align-items:center; justify-content:center;">×</button>` : ''}
       </div>
     `;
   });
-  
   html += `</div>`;
   return html;
 }
@@ -449,7 +461,6 @@ function removeInputRow(whIdx, code, type, idx) {
   render();
 }
 
-/* ---------------- VISTA RIEPILOGO TOTALE ---------------- */
 function renderRiepilogoView(container) {
   let html = `
     <table class="inventory-table" style="width:100%; border-collapse:collapse; background:#fff;">
@@ -468,7 +479,7 @@ function renderRiepilogoView(container) {
   `;
 
   if (rows.length === 0) {
-    html += `<tr><td colspan="7" style="padding:20px; text-align:center; color:#777;">Nessun prodotto caricato. <button onclick="renderUploadScreen()" style="background:#1976d2; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Carica File Excel</button></td></tr>`;
+    html += `<tr><td colspan="7" style="padding:20px; text-align:center; color:#777;">Nessun prodotto trovato. <button onclick="renderUploadScreen()" style="background:#1976d2; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Carica File</button></td></tr>`;
   } else {
     rows.forEach(r => {
       const att = n(r.atteso);
@@ -495,21 +506,16 @@ function renderRiepilogoView(container) {
   container.innerHTML = html;
 }
 
-/* ---------------- KPI & UTILS ---------------- */
 function recalcKPIs() {
-  let totalAtteso = 0;
-  let totalRilevato = 0;
-  let totalDiffValore = 0;
+  let totalAtteso = 0, totalRilevato = 0, totalDiffValore = 0;
 
   rows.forEach(r => {
     const att = n(r.atteso);
     const eff = getGlobalRilevato(r.code, r);
     const diff = eff - att;
-    const val = diff * n(r.standardCost);
-
     totalAtteso += att;
     totalRilevato += eff;
-    totalDiffValore += val;
+    totalDiffValore += diff * n(r.standardCost);
   });
 
   const diffPezziTotali = totalRilevato - totalAtteso;
@@ -534,25 +540,19 @@ function updateRowCalculations(code) {
   const r = rows.find(x => x.code === code);
   if (!r) return;
 
-  const effettivoTotaleComplesso = getGlobalRilevato(code, r);
-  const diffTotale = effettivoTotaleComplesso - r.atteso;
-  const diffValore = diffTotale * (r.standardCost || 0);
+  const eff = getGlobalRilevato(code, r);
+  const diff = eff - r.atteso;
+  const val = diff * (r.standardCost || 0);
 
   const whTotEl = document.getElementById(`wh-tot-${code}`);
   const effEl = document.getElementById(`eff-${code}`);
   const diffEl = document.getElementById(`diff-${code}`);
   const valEl = document.getElementById(`val-${code}`);
 
-  if (whTotEl) whTotEl.textContent = fmt(effettivoTotaleComplesso);
-  if (effEl) effEl.textContent = fmt(effettivoTotaleComplesso);
-  if (diffEl) {
-    diffEl.textContent = fmt(diffTotale);
-    diffEl.style.color = diffTotale === 0 ? "#2e7d32" : "#c62828";
-  }
-  if (valEl) {
-    valEl.textContent = `€ ${fmtMoney(diffValore)}`;
-    valEl.style.color = diffValore >= 0 ? "#2e7d32" : "#c62828";
-  }
+  if (whTotEl) whTotEl.textContent = fmt(eff);
+  if (effEl) effEl.textContent = fmt(eff);
+  if (diffEl) { diffEl.textContent = fmt(diff); diffEl.style.color = diff === 0 ? "#2e7d32" : "#c62828"; }
+  if (valEl) { valEl.textContent = `€ ${fmtMoney(val)}`; valEl.style.color = val >= 0 ? "#2e7d32" : "#c62828"; }
 }
 
 function openConfigModal() {
