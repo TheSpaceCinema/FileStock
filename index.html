@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestione Inventario Cinema</title>
-  <!-- Libreria SheetJS XLSX per lettura ed esportazione Excel -->
+  <!-- Libreria SheetJS XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -12,11 +12,11 @@
     body { background-color: #f4f6f9; color: #333; line-height: 1.5; padding-bottom: 40px; }
     
     .header { background-color: #1a237e; color: white; padding: 15px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-    .header-content { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; flex-wrap: wrap; gap: 10px; }
+    .header-content { display: flex; justify-content: space-between; align-items: center; max-width: 1600px; margin: 0 auto; flex-wrap: wrap; gap: 10px; }
     .header h1 { font-size: 1.4rem; font-weight: 600; }
     .header-btns { display: flex; gap: 10px; }
     
-    .container { max-width: 1400px; margin: 20px auto; padding: 0 15px; }
+    .container { max-width: 1600px; margin: 20px auto; padding: 0 15px; }
     .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
     
     .files-card { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -52,16 +52,37 @@
 
     /* TABELLA */
     .table-container { overflow-x: auto; padding: 0; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    th, td { border: 1px solid #e0e0e0; padding: 8px 10px; text-align: left; }
-    th { background-color: #f1f3f5; font-weight: 600; color: #333; position: sticky; top: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { border: 1px solid #e0e0e0; padding: 6px 8px; text-align: left; vertical-align: middle; }
+    th { background-color: #f1f3f5; font-weight: 600; color: #333; position: sticky; top: 0; z-index: 2; }
     th.num, td.num { text-align: right; }
     
     .grp-box { background-color: #e3f2fd; }
     .grp-sleeve { background-color: #f3e5f5; }
     .grp-sfuso { background-color: #fff3e0; }
 
-    .qty-input { width: 65px; padding: 4px 6px; text-align: right; border: 1px solid #bbb; border-radius: 4px; font-weight: bold; }
+    /* CONTENITORE SCORREVOLE PER CASELLE MULTIPLE STILE EXCEL */
+    .input-scroll-cell {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      max-width: 190px;
+      padding: 2px 0;
+      scrollbar-width: thin;
+    }
+    .input-scroll-cell::-webkit-scrollbar { height: 4px; }
+    .input-scroll-cell::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+
+    .qty-input {
+      min-width: 42px;
+      width: 42px;
+      padding: 3px 2px;
+      text-align: center;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
     .qty-input:focus { border-color: #1a237e; outline: none; background-color: #e8eaf6; }
 
     .cell-diff.ok { color: #2e7d32; font-weight: bold; }
@@ -160,6 +181,8 @@
     let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
     let currentTab = 0; 
     let countsData = {}; 
+
+    const MAX_FIELDS = 10; // Fino a 10 caselle inserimento per tipo
 
     const DEFAULT_CINEMAS = [
       "TSC Beinasco", "TSC Belpasso", "TSC Bologna", "TSC Casamassima", "TSC Catanzaro",
@@ -475,10 +498,41 @@
       render();
     }
 
-    function getCount(whIdx, code) {
+    // Gestione Array di valori per singolo magazzino
+    function getCountObj(whIdx, code) {
       if (!countsData[whIdx]) countsData[whIdx] = {};
-      if (!countsData[whIdx][code]) countsData[whIdx][code] = { box: 0, sleeve: 0, sfuso: 0 };
+      if (!countsData[whIdx][code]) {
+        countsData[whIdx][code] = {
+          boxArr: Array(MAX_FIELDS).fill(0),
+          sleeveArr: Array(MAX_FIELDS).fill(0),
+          sfusoArr: Array(MAX_FIELDS).fill(0)
+        };
+      } else {
+        // Retrocompatibilità se salvato in formato vecchio
+        const obj = countsData[whIdx][code];
+        if (!Array.isArray(obj.boxArr)) {
+          const b = obj.box || 0, sl = obj.sleeve || 0, sf = obj.sfuso || 0;
+          obj.boxArr = Array(MAX_FIELDS).fill(0); obj.boxArr[0] = b;
+          obj.sleeveArr = Array(MAX_FIELDS).fill(0); obj.sleeveArr[0] = sl;
+          obj.sfusoArr = Array(MAX_FIELDS).fill(0); obj.sfusoArr[0] = sf;
+        }
+      }
       return countsData[whIdx][code];
+    }
+
+    function sumArr(arr) { return arr.reduce((a, b) => a + (n(b) || 0), 0); }
+
+    function getGlobalProductTotals(code) {
+      let totPieces = 0;
+      warehouses.forEach((_, idx) => {
+        const c = getCountObj(idx, code);
+        const r = rows.find(x => x.code === code) || {};
+        const bSum = sumArr(c.boxArr);
+        const slSum = sumArr(c.sleeveArr);
+        const sfSum = sumArr(c.sfusoArr);
+        totPieces += (bSum * (r.boxSize || 0)) + (slSum * (r.sleeveSize || 0)) + sfSum;
+      });
+      return totPieces;
     }
 
     function render() {
@@ -495,15 +549,18 @@
           <th colspan="2" class="grp-box">BOX</th>
           <th colspan="2" class="grp-sleeve">SLEEVE</th>
           <th class="grp-sfuso">SFUSO</th>
-          <th colspan="3">${isTotTab ? 'CONFRONTO GLOBALE' : 'TOTALE ' + (warehouses[currentTab] || '').toUpperCase()}</th>
+          <th colspan="4">${isTotTab ? 'CONFRONTO GLOBALE' : 'CONTEGGIO ' + (warehouses[currentTab] || '').toUpperCase()}</th>
         </tr>
         <tr>
           <th>Codice</th><th>Prodotto</th><th>U.M.</th>
           <th class="num">Iniziale</th><th class="num">Danni</th><th class="num">Venduto</th>
-          <th class="num grp-box">Size</th><th class="num grp-box">Q.tà Box</th>
-          <th class="num grp-sleeve">Size</th><th class="num grp-sleeve">Q.tà Sleeve</th>
-          <th class="num grp-sfuso">Q.tà Sfuso</th>
-          <th class="num">Atteso</th><th class="num">Effettivo</th><th class="num">Diff.</th>
+          <th class="num grp-box">Size</th><th class="grp-box">Inserimento Box</th>
+          <th class="num grp-sleeve">Size</th><th class="grp-sleeve">Inserimento Sleeve</th>
+          <th class="grp-sfuso">Inserimento Sfuso</th>
+          <th class="num">Atteso Totale</th>
+          <th class="num">${isTotTab ? 'Totale Rilevato' : 'Locale'}</th>
+          <th class="num">Globale</th>
+          <th class="num">Diff. Globale</th>
         </tr>
       `;
 
@@ -512,24 +569,48 @@
       data.forEach(r => {
         const tr = document.createElement("tr");
 
-        let boxQty = 0, sleeveQty = 0, sfusoQty = 0;
+        let globalEffettivo = getGlobalProductTotals(r.code);
+        let globalDiff = globalEffettivo - r.atteso;
 
-        if (isTotTab) {
-          warehouses.forEach((_, idx) => {
-            const c = getCount(idx, r.code);
-            boxQty += c.box;
-            sleeveQty += c.sleeve;
-            sfusoQty += c.sfuso;
-          });
-        } else {
-          const c = getCount(currentTab, r.code);
-          boxQty = c.box;
-          sleeveQty = c.sleeve;
-          sfusoQty = c.sfuso;
+        let localEffettivo = 0;
+        let cObj = null;
+
+        if (!isTotTab) {
+          cObj = getCountObj(currentTab, r.code);
+          const bSum = sumArr(cObj.boxArr);
+          const slSum = sumArr(cObj.sleeveArr);
+          const sfSum = sumArr(cObj.sfusoArr);
+          localEffettivo = (bSum * r.boxSize) + (slSum * r.sleeveSize) + sfSum;
         }
 
-        const effettivo = (boxQty * r.boxSize) + (sleeveQty * r.sleeveSize) + sfusoQty;
-        const diff = effettivo - r.atteso;
+        // Genera griglie di input o riepilogo
+        let boxHTML = "", sleeveHTML = "", sfusoHTML = "";
+
+        if (isTotTab) {
+          let totB = 0, totSl = 0, totSf = 0;
+          warehouses.forEach((_, idx) => {
+            const co = getCountObj(idx, r.code);
+            totB += sumArr(co.boxArr);
+            totSl += sumArr(co.sleeveArr);
+            totSf += sumArr(co.sfusoArr);
+          });
+          boxHTML = `<div class="num font-bold">${totB ? fmt(totB) : '-'}</div>`;
+          sleeveHTML = `<div class="num font-bold">${totSl ? fmt(totSl) : '-'}</div>`;
+          sfusoHTML = `<div class="num font-bold">${totSf ? fmt(totSf) : '-'}</div>`;
+        } else {
+          // Genera la striscia scorrevole di caselle
+          boxHTML = `<div class="input-scroll-cell">` + 
+            cObj.boxArr.map((v, i) => `<input class="qty-input in-box" data-idx="${i}" type="number" min="0" value="${v || ''}">`).join('') + 
+            `</div>`;
+
+          sleeveHTML = `<div class="input-scroll-cell">` + 
+            cObj.sleeveArr.map((v, i) => `<input class="qty-input in-sleeve" data-idx="${i}" type="number" min="0" value="${v || ''}">`).join('') + 
+            `</div>`;
+
+          sfusoHTML = `<div class="input-scroll-cell">` + 
+            cObj.sfusoArr.map((v, i) => `<input class="qty-input in-sfuso" data-idx="${i}" type="number" min="0" value="${v || ''}">`).join('') + 
+            `</div>`;
+        }
 
         tr.innerHTML = `
           <td>${esc(r.code)}</td>
@@ -540,44 +621,52 @@
           <td class="num">${fmt(r.venduto)}</td>
           
           <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
-          <td class="num grp-box">${isTotTab ? fmt(boxQty) : `<input class="qty-input in-box" type="number" min="0" value="${boxQty || ''}">`}</td>
+          <td class="grp-box">${boxHTML}</td>
           
           <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
-          <td class="num grp-sleeve">${isTotTab ? fmt(sleeveQty) : `<input class="qty-input in-sleeve" type="number" min="0" value="${sleeveQty || ''}">`}</td>
+          <td class="grp-sleeve">${sleeveHTML}</td>
           
-          <td class="num grp-sfuso">${isTotTab ? fmt(sfusoQty) : `<input class="qty-input in-sfuso" type="number" min="0" value="${sfusoQty || ''}">`}</td>
+          <td class="grp-sfuso">${sfusoHTML}</td>
           
-          <td class="num">${fmt(r.atteso)}</td>
-          <td class="num cell-eff">${fmt(effettivo)}</td>
-          <td class="num cell-diff ${diff === 0 ? 'ok' : 'bad'}">${fmt(diff)}</td>
+          <td class="num font-bold">${fmt(r.atteso)}</td>
+          <td class="num cell-local font-bold">${isTotTab ? fmt(globalEffettivo) : fmt(localEffettivo)}</td>
+          <td class="num cell-global font-bold">${fmt(globalEffettivo)}</td>
+          <td class="num cell-diff ${globalDiff === 0 ? 'ok' : 'bad'}">${fmt(globalDiff)}</td>
         `;
 
         if (!isTotTab) {
-          const inBox = tr.querySelector(".in-box");
-          const inSleeve = tr.querySelector(".in-sleeve");
-          const inSfuso = tr.querySelector(".in-sfuso");
-          const cellEff = tr.querySelector(".cell-eff");
+          const inputsBox = tr.querySelectorAll(".in-box");
+          const inputsSleeve = tr.querySelectorAll(".in-sleeve");
+          const inputsSfuso = tr.querySelectorAll(".in-sfuso");
+          
+          const cellLocal = tr.querySelector(".cell-local");
+          const cellGlobal = tr.querySelector(".cell-global");
           const cellDiff = tr.querySelector(".cell-diff");
 
           function updateVal() {
-            const c = getCount(currentTab, r.code);
-            c.box = n(inBox.value);
-            c.sleeve = n(inSleeve.value);
-            c.sfuso = n(inSfuso.value);
+            inputsBox.forEach(inp => { cObj.boxArr[inp.dataset.idx] = n(inp.value); });
+            inputsSleeve.forEach(inp => { cObj.sleeveArr[inp.dataset.idx] = n(inp.value); });
+            inputsSfuso.forEach(inp => { cObj.sfusoArr[inp.dataset.idx] = n(inp.value); });
 
             saveCountsToStorage();
 
-            const tot = (c.box * r.boxSize) + (c.sleeve * r.sleeveSize) + c.sfuso;
-            const d = tot - r.atteso;
+            const bSum = sumArr(cObj.boxArr);
+            const slSum = sumArr(cObj.sleeveArr);
+            const sfSum = sumArr(cObj.sfusoArr);
+            
+            const locEff = (bSum * r.boxSize) + (slSum * r.sleeveSize) + sfSum;
+            const globEff = getGlobalProductTotals(r.code);
+            const globDiff = globEff - r.atteso;
 
-            cellEff.textContent = fmt(tot);
-            cellDiff.textContent = fmt(d);
-            cellDiff.className = "num cell-diff " + (d === 0 ? "ok" : "bad");
+            cellLocal.textContent = fmt(locEff);
+            cellGlobal.textContent = fmt(globEff);
+            cellDiff.textContent = fmt(globDiff);
+            cellDiff.className = "num cell-diff " + (globDiff === 0 ? "ok" : "bad");
           }
 
-          inBox.addEventListener("input", updateVal);
-          inSleeve.addEventListener("input", updateVal);
-          inSfuso.addEventListener("input", updateVal);
+          [...inputsBox, ...inputsSleeve, ...inputsSfuso].forEach(inp => {
+            inp.addEventListener("input", updateVal);
+          });
         }
 
         $("tbody").appendChild(tr);
@@ -599,20 +688,12 @@
 
       const totData = [
         [`CINEMA / SEDE: ${cinemaName.toUpperCase()}`],
-        ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale", "Differenza Totale"]
+        ["Codice", "Prodotto", "U.M.", "Iniziale", "Danni", "Venduto", "Atteso Totale", "Effettivo Totale Globale", "Differenza Globale"]
       ];
 
       rows.forEach(r => {
-        let totBox = 0, totSleeve = 0, totSfuso = 0;
-        warehouses.forEach((_, idx) => {
-          const c = getCount(idx, r.code);
-          totBox += c.box;
-          totSleeve += c.sleeve;
-          totSfuso += c.sfuso;
-        });
-
-        const effettivoTot = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
-        const diffTot = effettivoTot - r.atteso;
+        const globEff = getGlobalProductTotals(r.code);
+        const globDiff = globEff - r.atteso;
 
         totData.push([
           r.code,
@@ -622,8 +703,8 @@
           r.danni,
           r.venduto,
           r.atteso,
-          effettivoTot,
-          diffTot
+          globEff,
+          globDiff
         ]);
       });
 
@@ -633,23 +714,26 @@
       warehouses.forEach((whName, idx) => {
         const whData = [
           [`MAGAZZINO: ${whName.toUpperCase()} — SEDE: ${cinemaName.toUpperCase()}`],
-          ["Codice", "Prodotto", "U.M.", "Box Size", "Q.tà Box", "Sleeve Size", "Q.tà Sleeve", "Q.tà Sfuso", "Totale Rilevato (Pezzi)"]
+          ["Codice", "Prodotto", "U.M.", "Box Size", "Totale Box", "Sleeve Size", "Totale Sleeve", "Totale Sfuso", "Totale Rilevato Locale (Pezzi)"]
         ];
 
         rows.forEach(r => {
-          const c = getCount(idx, r.code);
-          const effettivoWh = (c.box * r.boxSize) + (c.sleeve * r.sleeveSize) + c.sfuso;
+          const c = getCountObj(idx, r.code);
+          const bSum = sumArr(c.boxArr);
+          const slSum = sumArr(c.sleeveArr);
+          const sfSum = sumArr(c.sfusoArr);
+          const locEff = (bSum * r.boxSize) + (slSum * r.sleeveSize) + sfSum;
 
           whData.push([
             r.code,
             r.name,
             r.uom,
             r.boxSize || 0,
-            c.box,
+            bSum,
             r.sleeveSize || 0,
-            c.sleeve,
-            c.sfuso,
-            effettivoWh
+            slSum,
+            sfSum,
+            locEff
           ]);
         });
 
