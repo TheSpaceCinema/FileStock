@@ -472,22 +472,19 @@ function getCount(whIdx, code) {
 function sumArr(arr) { return arr.reduce((a, b) => a + n(b), 0); }
 
 /* CALCOLO GLOBALE CON SCOMPOSIZIONE KIT SUI COMPONENTI */
-function getGlobalRilevato(code, r) {
-  let totBox = 0, totSleeve = 0, totSfuso = 0;
-  warehouses.forEach((_, idx) => {
-    const c = getCount(idx, code);
-    totBox += sumArr(c.box);
-    totSleeve += sumArr(c.sleeve);
-    totSfuso += sumArr(c.sfuso);
-  });
-  
-  let basePezzi = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
-
+/* FUNZIONE PER CALCOLO E ESTRAZIONE DEL CONTRIBUTO DEI KIT */
+function getKitContributionDetail(productName, productCode) {
   let kitContribution = 0;
+  const normProdName = norm(productName);
+  const normProdCode = norm(productCode);
+
   rows.forEach(rowItem => {
     if (rowItem.isKit && rowItem.ingredients && rowItem.ingredients.length > 0) {
       rowItem.ingredients.forEach(ing => {
-        if (norm(ing.name) === norm(r.name)) {
+        const normIngName = norm(ing.name);
+        
+        // Matching flessibile tra ingrediente del kit e prodotto di magazzino
+        if (normProdName.includes(normIngName) || normIngName.includes(normProdName) || (productCode && normProdCode === norm(ing.code))) {
           warehouses.forEach((_, wIdx) => {
             const kitCounts = getCount(wIdx, rowItem.code);
             const kitBoxTot = sumArr(kitCounts.box);
@@ -502,7 +499,20 @@ function getGlobalRilevato(code, r) {
     }
   });
 
-  return basePezzi + kitContribution;
+  return kitContribution;
+}
+
+function getGlobalRilevato(code, r) {
+  let totBox = 0, totSleeve = 0, totSfuso = 0;
+  warehouses.forEach((_, idx) => {
+    const c = getCount(idx, code);
+    totBox += sumArr(c.box);
+    totSleeve += sumArr(c.sleeve);
+    totSfuso += sumArr(c.sfuso);
+  });
+  
+  let basePezzi = (totBox * r.boxSize) + (totSleeve * r.sleeveSize) + totSfuso;
+  return basePezzi + getKitContributionDetail(r.name, r.code);
 }
 
 /* ---------------- TABLE RENDER ---------------- */
