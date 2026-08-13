@@ -39,6 +39,11 @@ document.addEventListener("DOMContentLoaded", () => {
     fileSize.addEventListener("change", (e) => handleFileUpload(e, "size"));
   }
 
+  const searchInput = $("search");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => render());
+  }
+
   switchTab();
 });
 
@@ -70,7 +75,6 @@ function handleFileUpload(e, type) {
 
 function processReportData(json) {
   rows = [];
-  // Scansione righe Excel (adatta indici colonne in base alla tua struttura)
   for (let i = 1; i < json.length; i++) {
     const row = json[i];
     if (!row || row.length === 0) continue;
@@ -110,7 +114,6 @@ function processSizeData(json) {
     alert("Carica prima il Report Magazzino!");
     return;
   }
-  // Mappatura Anagrafica Size
   for (let i = 1; i < json.length; i++) {
     const row = json[i];
     if (!row) continue;
@@ -164,6 +167,17 @@ function getGlobalRilevato(productCode, rowObj) {
     totalBase += (sumArr(c.box) * boxSize) + (sumArr(c.sleeve) * sleeveSize) + sumArr(c.sfuso);
   });
   return totalBase + getKitContributionDetail(rowObj.name, productCode);
+}
+
+function clearAllCounts() {
+  if (confirm("Sei sicuro di voler azzerare tutti i conteggi inseriti?")) {
+    counts = {};
+    candyData = [];
+    postMixData = [];
+    distributorData = [];
+    render();
+    alert("Conteggi azzerati con successo!");
+  }
 }
 
 // ==========================================
@@ -242,6 +256,39 @@ function render() {
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   if ($("count")) $("count").textContent = `${data.length} prodotti`;
   const isTotTab = (currentTab === 'tot');
+
+  if ($("thead")) {
+    $("thead").innerHTML = `
+      <tr>
+        <th colspan="2" style="background: #212529; color: white;">PRODOTTO</th>
+        <th colspan="3" style="background: #343a40; color: white;">REPORT MAGAZZINO</th>
+        <th colspan="2" class="grp-box" style="background: #e3f2fd; color: #0d47a1;">BOX</th>
+        <th colspan="2" class="grp-sleeve" style="background: #f3e5f5; color: #4a148c;">SLEEVE</th>
+        <th class="grp-sfuso" style="background: #fff9c4; color: #f57f17;">SFUSO</th>
+        <th colspan="5" style="background: #212529; color: white;">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
+        <th colspan="2" class="grp-valore" style="background: #ffebee; color: #b71c1c;">VALORIZZAZIONE</th>
+      </tr>
+      <tr style="background: #343a40; color: white;">
+        <th style="background: #343a40; color: white;">Prodotto</th>
+        <th style="background: #343a40; color: white;">U.M.</th>
+        <th class="num" style="background: #343a40; color: white;">Iniziale</th>
+        <th class="num" style="background: #343a40; color: white;">Danni</th>
+        <th class="num" style="background: #343a40; color: white;">Venduto</th>
+        <th class="num grp-box" style="background: #bbdefb; color: #0d47a1;">Size</th>
+        <th class="grp-box" style="background: #bbdefb; color: #0d47a1;">Q.tà Box</th>
+        <th class="num grp-sleeve" style="background: #e1bee7; color: #4a148c;">Size</th>
+        <th class="grp-sleeve" style="background: #e1bee7; color: #4a148c;">Q.tà Sleeve</th>
+        <th class="grp-sfuso" style="background: #fff59d; color: #f57f17;">Q.tà Sfuso</th>
+        <th class="num" style="background: #343a40; color: white;">Atteso</th>
+        <th class="num" style="background: #343a40; color: white;">Rilevato Base</th>
+        <th class="num" style="background: #e3f2fd; color: #1976d2;">➕ Da Kit/Spec.</th>
+        <th class="num" style="background: #343a40; color: white;">Effettivo Totale</th>
+        <th class="num" style="background: #343a40; color: white;">Diff. Totale</th>
+        <th class="num grp-valore" style="background: #ffcdd2; color: #b71c1c;">Costo Unit.</th>
+        <th class="num grp-valore" style="background: #ffcdd2; color: #b71c1c;">Diff. Valore</th>
+      </tr>
+    `;
+  }
 
   if ($("tbody")) {
     $("tbody").innerHTML = "";
