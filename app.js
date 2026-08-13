@@ -2,8 +2,9 @@
    GESTIONE MAGAZZINO / INVENTARIO CINEMA — APPLICAZIONE COMPLETA
    ========================================================================== */
 
-// Stato globale dell'applicazione
-let cinemaName = "TSC Nola"; // Esempio di default
+let cinemaName = "TSC Nola";
+
+// Inizializzazione degli stati globali
 window.candyConfig = window.candyConfig || {
   tares: ["", "", "", ""],
   numBlocks: 1,
@@ -11,12 +12,23 @@ window.candyConfig = window.candyConfig || {
   blocks: [{ rows: 3, cols: 3, cells: {} }]
 };
 
-// Funzione di utilità per il selettore DOM
+window.distributorConfig = window.distributorConfig || {
+  distributors: [
+    {
+      name: "MARS 1-9",
+      date: "",
+      fondoResti: 35,
+      rows: [
+        { product: "", stockIniziale: 0, ins: ["","","","",""], contaFinale: 0, prezzoVendita: 0 }
+      ]
+    }
+  ]
+};
+
 function $(selector) {
   return document.querySelector(selector);
 }
 
-// Funzione di escape per sicurezza HTML
 function esc(str) {
   if (!str) return "";
   return String(str)
@@ -28,7 +40,7 @@ function esc(str) {
 }
 
 /* --------------------------------------------------------------------------
-   1. GESTIONE SEZIONE CARAMELLE
+   1. SEZIONE CARAMELLE (Con tare in alto, blocchi e menù tendina)
    -------------------------------------------------------------------------- */
 function renderCandyView() {
   const container = $("tbody");
@@ -41,7 +53,7 @@ function renderCandyView() {
 
   let html = `<tr><td colspan="10" style="padding:15px; background:#fdf2e9;">`;
 
-  // Pannello di configurazione superiore
+  // Pannello superiore con 4 tare, num blocchi e layout orizzontale/verticale
   html += `<div style="background:white; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #f5b041; display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
              <div>
                <strong>Tare (4 valori):</strong><br>
@@ -67,7 +79,7 @@ function renderCandyView() {
              </div>
            </div>`;
 
-  // Area dei Blocchi dinamici
+  // Area dinamica dei blocchi
   html += `<div style="display:flex; flex-direction: ${cfg.layout === 'horizontal' ? 'row' : 'column'}; flex-wrap:wrap; gap:15px;">`;
 
   for(let bIdx=0; bIdx < cfg.numBlocks; bIdx++) {
@@ -145,37 +157,14 @@ function updateCandyCell(bIdx, r, c, val) {
 
 
 /* --------------------------------------------------------------------------
-   2. GESTIONE SEZIONE DISTRIBUTORI AUTOMATICI
+   2. SEZIONE DISTRIBUTORI AUTOMATICI (Con 5 reintegri, data e prezzo)
    -------------------------------------------------------------------------- */
-function getActiveCinemaDistributorConfig() {
-  // Configurazione di fallback o recupero dallo storage locale
-  if (!window.distributorConfig) {
-    window.distributorConfig = {
-      distributors: [
-        {
-          name: "MARS 1-9",
-          date: "",
-          fondoResti: 35,
-          rows: [
-            { product: "", stockIniziale: 0, ins: ["","","","",""], contaFinale: 0, prezzoVendita: 0 }
-          ]
-        }
-      ]
-    };
-  }
-  return window.distributorConfig;
-}
-
-function saveDistributorConfig() {
-  // Salvataggio dati locale (se previsto nel tuo storage)
-}
-
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
   if (!container || !thead) return;
 
-  const cfg = getActiveCinemaDistributorConfig();
+  const cfg = window.distributorConfig;
   thead.innerHTML = `<tr><th colspan="10" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
 
   let html = `<tr><td colspan="10" style="padding:15px; background:#f5eef8;">`;
@@ -223,28 +212,25 @@ function renderDistributorsView() {
 }
 
 function updateDistMeta(dIdx, key, val) {
-  const cfg = getActiveCinemaDistributorConfig();
+  const cfg = window.distributorConfig;
   if (cfg.distributors[dIdx]) {
     cfg.distributors[dIdx][key] = val;
-    saveDistributorConfig();
   }
 }
 
 function updateDistIns(dIdx, rIdx, insIdx, val) {
-  const cfg = getActiveCinemaDistributorConfig();
+  const cfg = window.distributorConfig;
   if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
     if (!cfg.distributors[dIdx].rows[rIdx].ins) {
       cfg.distributors[dIdx].rows[rIdx].ins = ["", "", "", "", ""];
     }
     cfg.distributors[dIdx].rows[rIdx].ins[insIdx] = val;
-    saveDistributorConfig();
   }
 }
 
 function updateDistRow(dIdx, rIdx, key, val) {
-  const cfg = getActiveCinemaDistributorConfig();
+  const cfg = window.distributorConfig;
   if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
     cfg.distributors[dIdx].rows[rIdx][key] = val;
-    saveDistributorConfig();
   }
 }
