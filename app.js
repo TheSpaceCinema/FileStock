@@ -70,8 +70,8 @@ function getCandyTotalKg() {
       }
     });
   }
-  if (Array.isArray(cfg.buste)) {
-    cfg.buste.forEach(b => { total += n(b.kg) + (n(b.sleeve) * 0.1); });
+ if (Array.isArray(cfg.buste)) {
+    cfg.buste.forEach(b => { total += n(b.kg) * n(b.sleeve); });
   }
   return total;
 }
@@ -438,19 +438,40 @@ function renderPostMixView() {
     html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1;">
               <h5 style="color:#2980b9;">${esc(b.name)}</h5>
               <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 6)}, 1fr); gap:6px; margin-top:8px; overflow-x:auto;">`;
-    for(let r=0; r<b.rows; r++) {
+let innerCellsHTML = '';
+    
+    // Funzione interna per generare la singola cella
+    const renderCell = (r, c) => {
+      let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
+      let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+      return `
+        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+          <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
+            ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
+          </select>
+          <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
+            oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
+        </div>`;
+    };
+
+    if (cfg.orientation === 'horizontal') {
+      // Prima tutte le colonne di una riga, poi la riga successiva
+      for(let r=0; r<b.rows; r++) {
+        for(let c=0; c<b.columns; c++) {
+          innerCellsHTML += renderCell(r, c);
+        }
+      }
+    } else {
+      // Prima tutte le righe di una colonna, poi la colonna successiva (Verticale)
       for(let c=0; c<b.columns; c++) {
-        let cell = b.gridValues?.[r]?.[c] || { prodName: "", weight: "" };
-        html += `<div style="border:1px solid #ccc; padding:4px; text-align:center; background:#fafafa; border-radius:4px;">
-                  <select style="width:100%; font-size:0.75rem; margin-bottom:2px;" onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, this.value, null)">
-                    <option value="">-- Prodotto --</option>
-                    ${postMixProducts.map(p => `<option value="${esc(p.name)}" ${cell.prodName === p.name ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
-                  </select>
-                  <input type="number" step="any" placeholder="Kg Lordi" value="${cell.weight || ''}" style="width:100%; font-size:0.8rem; text-align:center;"
-                    onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, null, this.value)">
-                </div>`;
+        for(let r=0; r<b.rows; r++) {
+          innerCellsHTML += renderCell(r, c);
+        }
       }
     }
+    
+    html += innerCellsHTML;
     html += `</div></div>`;
   });
 
@@ -617,7 +638,7 @@ function exportCandyGridExcel(isEmpty) {
   cfg.buste.forEach((b, idx) => {
     let kg = isEmpty ? "" : b.kg;
     let sl = isEmpty ? "" : b.sleeve;
-    let tot = isEmpty ? "" : (n(b.kg) + n(b.sleeve)*0.1).toFixed(2);
+    let tot = isEmpty ? "" : (n(b.kg) * n(b.sleeve)).toFixed(2);
     html += `<tr><td>Busta ${idx + 1}</td><td>${kg}</td><td>${sl}</td><td>${tot}</td></tr>`;
   });
   html += `</table></body></html>`;
