@@ -220,37 +220,140 @@ function renderCandyView() {
   const cfg = getActiveCinemaCandyConfig();
   thead.innerHTML = `<tr><th colspan="10" style="background:#d35400; color:white; font-size:1.1rem; padding:10px;">🍬 Gestione Inserimento Caramelle (${esc(cinemaName)})</th></tr>`;
   
-  let html = `<tr><td colspan="10" style="padding:15px; background:#fff3e0;">`;
-  html += `<h4>Totale Netto Calcolato: <span style="color:#d35400;">${getCandyTotalKg().toFixed(2)} Kg</span></h4>`;
-  html += `<p style="font-size:0.85rem; color:#666;">Inserisci i pesi rilevati nelle vaschette/buste. Le tare verranno sottratte automaticamente.</p>`;
+  let html = `<tr><td colspan="10" style="padding:20px; background:#fff3e0;">`;
+  
+  // Riepilogo Totale e Configurazione Tare in alto
+  html += `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:20px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
+      <div>
+        <h3 style="color:#d35400; margin-bottom:5px;">Totale Netto Caramelle: <span id="candyTotalKgDisplay">${getCandyTotalKg().toFixed(2)} Kg</span></h3>
+        <p style="font-size:0.85rem; color:#666;">Seleziona la tara dal menù a tendina sopra ogni cella o configura i valori delle tare e la griglia.</p>
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="openCandySettingsModal()" style="background:#e67e22; border:none;">⚙️ Configura Righe, Colonne e Tare</button>
+      </div>
+    </div>
+  `;
 
+  // Render dei Blocchi di vaschette con menù a tendina tare per cella
   cfg.blocks.forEach((b, bIdx) => {
-    html += `<div style="margin-top:15px; background:white; padding:10px; border-radius:6px; border:1px solid #ffe0b2;">
-              <h5 style="color:#e67e22;">${esc(b.name)} (${b.rows}x${b.columns})</h5>
-              <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 10)}, 1fr); gap:5px; margin-top:8px; overflow-x:auto;">`;
+    html += `<div style="margin-top:15px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
+              <h5 style="color:#e67e22; margin-bottom:10px;">${esc(b.name)} — (${b.rows} Righe × ${b.columns} Colonne)</h5>
+              <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 12)}, 1fr); gap:8px; margin-top:8px; overflow-x:auto; padding-bottom:5px;">`;
+    
     for(let r=0; r<b.rows; r++) {
       for(let c=0; c<b.columns; c++) {
         let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
-        html += `<div style="border:1px solid #ccc; padding:4px; text-align:center; background:#fafafa; border-radius:4px;">
-                  <span style="font-size:0.75rem; color:#888;">R${r+1}-C${c+1}</span>
-                  <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.8rem; text-align:center;" 
-                    onchange="updateCandyCell(${bIdx}, ${r}, ${c}, this.value)">
-                </div>`;
+        let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+
+        html += `
+          <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
+            <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+            <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
+              ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
+            </select>
+            <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
+              oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
+          </div>`;
       }
     }
     html += `</div></div>`;
   });
 
-  html += `</td></tr>`;
+  // Sezione Buste e Scorte Sfuse
+  html += `
+    <div style="margin-top:25px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
+      <h5 style="color:#e67e22; margin-bottom:10px;">📦 Gestione Buste e Scorte Sfuse</h5>
+      <p style="font-size:0.85rem; color:#666; margin-bottom:12px;">Inserisci i Kg lordi e il numero di sleeve per ciascuna busta.</p>
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:10px;">
+  `;
+
+  cfg.buste.forEach((busta, bIdx) => {
+    html += `
+      <div style="border:1px solid #ddd; padding:10px; border-radius:6px; background:#fafafa; display:flex; flex-direction:column; gap:6px;">
+        <span style="font-size:0.8rem; font-weight:bold; color:#444;">Busta ${bIdx + 1}</span>
+        <div style="display:flex; gap:6px;">
+          <div style="flex:1;">
+            <label style="font-size:0.7rem; color:#666; display:block;">Kg Lordi</label>
+            <input type="number" step="any" value="${busta.kg || ''}" placeholder="0.00" style="width:100%; padding:4px; text-align:center; font-size:0.85rem;" oninput="updateBustaData(${bIdx}, 'kg', this.value)">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:0.7rem; color:#666; display:block;">Sleeve (Pz)</label>
+            <input type="number" step="any" value="${busta.sleeve || ''}" placeholder="0" style="width:100%; padding:4px; text-align:center; font-size:0.85rem;" oninput="updateBustaData(${bIdx}, 'sleeve', this.value)">
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div></div></td></tr>`;
   container.innerHTML = html;
 }
 
-function updateCandyCell(bIdx, r, c, val) {
+function updateCandyCellWeight(bIdx, r, c, val) {
   const cfg = getActiveCinemaCandyConfig();
   if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
   if (!cfg.blocks[bIdx].gridValues[r]) cfg.blocks[bIdx].gridValues[r] = {};
-  cfg.blocks[bIdx].gridValues[r][c] = { weight: val, taraIdx: 0 };
+  if (!cfg.blocks[bIdx].gridValues[r][c]) cfg.blocks[bIdx].gridValues[r][c] = { weight: "", taraIdx: 0 };
+  
+  cfg.blocks[bIdx].gridValues[r][c].weight = val;
   saveCandyConfig();
+  updateCandyTotalUI();
+}
+
+function updateCandyCellTara(bIdx, r, c, taraIdx) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
+  if (!cfg.blocks[bIdx].gridValues[r]) cfg.blocks[bIdx].gridValues[r] = {};
+  if (!cfg.blocks[bIdx].gridValues[r][c]) cfg.blocks[bIdx].gridValues[r][c] = { weight: "", taraIdx: 0 };
+  
+  cfg.blocks[bIdx].gridValues[r][c].taraIdx = parseInt(taraIdx) || 0;
+  saveCandyConfig();
+  updateCandyTotalUI();
+}
+
+function updateBustaData(bIdx, field, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg.buste[bIdx]) cfg.buste[bIdx] = { kg: 0, sleeve: 0 };
+  cfg.buste[bIdx][field] = n(val);
+  saveCandyConfig();
+  updateCandyTotalUI();
+}
+
+function updateCandyTotalUI() {
+  const totalEl = document.getElementById("candyTotalKgDisplay");
+  if (totalEl) {
+    totalEl.textContent = `${getCandyTotalKg().toFixed(2)} Kg`;
+  }
+  recalcKPIs();
+}
+
+function openCandySettingsModal() {
+  const cfg = getActiveCinemaCandyConfig();
+  let taresStr = prompt("Inserisci i valori delle tare separati da virgola (es. 0.37, 0.72, 0.50, 1.00):", cfg.tares.join(", "));
+  if (taresStr === null) return;
+  
+  let newTares = taresStr.split(",").map(x => n(x.trim())).filter(x => x >= 0);
+  if (newTares.length > 0) cfg.tares = newTares;
+
+  let blocksCount = prompt("Quanti blocchi/espositori di caramelle vuoi gestire?", cfg.blocks.length);
+  if (blocksCount !== null && parseInt(blocksCount) > 0) {
+    let count = parseInt(blocksCount);
+    while (cfg.blocks.length < count) {
+      cfg.blocks.push({ id: `block_${cfg.blocks.length}`, name: `📦 Blocco ${cfg.blocks.length + 1}`, columns: 10, rows: 2, gridValues: {} });
+    }
+    cfg.blocks = cfg.blocks.slice(0, count);
+    
+    cfg.blocks.forEach((b, idx) => {
+      let r = prompt(`Inserisci il numero di righe per "${b.name}":`, b.rows);
+      let c = prompt(`Inserisci il numero di colonne per "${b.name}":`, b.columns);
+      if (r !== null) b.rows = Math.max(1, parseInt(r) || 1);
+      if (c !== null) b.columns = Math.max(1, parseInt(c) || 1);
+    });
+  }
+
+  saveCandyConfig();
+  renderCandyView();
   recalcKPIs();
 }
 
@@ -317,68 +420,30 @@ function renderDistributorsView() {
   thead.innerHTML = `<tr><th colspan="10" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
 
   let html = `<tr><td colspan="10" style="padding:15px; background:#f5eef8;">`;
-  
   cfg.distributors.forEach((d, dIdx) => {
     html += `<div style="background:white; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #d2b4de;">
-              <h5 style="color:#8e44ad; margin-bottom:8px;">${esc(d.name)} — Data: <input type="text" value="${esc(d.date || '')}" placeholder="13/08/2026" style="padding:2px 6px; width:100px; border:1px solid #ccc; border-radius:3px;" onchange="updateDistMeta(${dIdx}, 'date', this.value)"> — Fondo Resti: €<input type="number" value="${d.fondoResti}" style="padding:2px 6px; width:60px; border:1px solid #ccc; border-radius:3px;" onchange="updateDistMeta(${dIdx}, 'fondoResti', this.value)"></h5>
+              <h5 style="color:#8e44ad; margin-bottom:8px;">${esc(d.name)} — Fondo Resti: €${d.fondoResti}</h5>
               <table style="width:100%; font-size:0.8rem; border-collapse:collapse;">
                 <thead>
                   <tr style="background:#ebdef0;">
-                    <th style="padding:5px; border:1px solid #d2b4de;">Prodotto</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:90px;">Stock Iniziale</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 1</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 2</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 3</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 4</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 5</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:90px;">Conta Finale</th>
-                    <th style="padding:5px; border:1px solid #d2b4de; width:80px;">Prezzo (€)</th>
+                    <th style="padding:4px;">Prodotto</th>
+                    <th style="padding:4px;">Stock Iniziale</th>
+                    <th style="padding:4px;">Conta Finale</th>
                   </tr>
                 </thead>
                 <tbody>`;
-                
     d.rows.forEach((r, rIdx) => {
       html += `<tr>
-                <td style="padding:3px; border:1px solid #eee;"><input type="text" value="${esc(r.product)}" placeholder="Nome Prodotto" style="width:100%; border:1px solid #ddd; padding:4px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)"></td>
-                <td style="padding:3px; border:1px solid #eee;"><input type="number" value="${r.stockIniziale}" style="width:100%; border:1px solid #ddd; text-align:center; padding:4px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>`;
-                
-      // Genera i 5 campi di reintegro (Ins 1 - Ins 5)
-      for(let i=0; i<5; i++) {
-        let insVal = (r.ins && r.ins[i]) !== undefined ? r.ins[i] : "";
-        html += `<td style="padding:3px; border:1px solid #eee;"><input type="number" value="${insVal}" style="width:100%; border:1px solid #ddd; text-align:center; padding:4px;" onchange="updateDistIns(${dIdx}, ${rIdx}, ${i}, this.value)"></td>`;
-      }
-
-      html += `
-                <td style="padding:3px; border:1px solid #eee;"><input type="number" value="${r.contaFinale}" style="width:100%; border:1px solid #ddd; text-align:center; font-weight:bold; padding:4px; background:#fcf3cf;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
-                <td style="padding:3px; border:1px solid #eee;"><input type="number" step="any" value="${r.prezzoVendita || ''}" placeholder="0.00" style="width:100%; border:1px solid #ddd; text-align:center; padding:4px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'prezzoVendita', this.value)"></td>
+                <td><input type="text" value="${esc(r.product)}" placeholder="Nome Prodotto" style="width:100%; border:1px solid #ddd;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)"></td>
+                <td><input type="number" value="${r.stockIniziale}" style="width:100%; border:1px solid #ddd; text-align:center;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>
+                <td><input type="number" value="${r.contaFinale}" style="width:100%; border:1px solid #ddd; text-align:center; font-weight:bold;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
               </tr>`;
     });
-    
     html += `</tbody></table></div>`;
   });
 
   html += `</td></tr>`;
   container.innerHTML = html;
-}
-
-// Funzioni di supporto aggiuntive per i metadati e i reintegri multipli dei distributori
-function updateDistMeta(dIdx, key, val) {
-  const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx]) {
-    cfg.distributors[dIdx][key] = val;
-    saveDistributorConfig();
-  }
-}
-
-function updateDistIns(dIdx, rIdx, insIdx, val) {
-  const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
-    if (!cfg.distributors[dIdx].rows[rIdx].ins) {
-      cfg.distributors[dIdx].rows[rIdx].ins = ["", "", "", "", ""];
-    }
-    cfg.distributors[dIdx].rows[rIdx].ins[insIdx] = val;
-    saveDistributorConfig();
-  }
 }
 
 function updateDistRow(dIdx, rIdx, key, val) {
