@@ -1061,47 +1061,68 @@ function getGlobalRilevato(code, r) {
 function render() {
   if (currentTab === 'setup') return;
 
-  // 1. Identifichiamo la tabella e cerchiamo/creiamo il contenitore per le viste speciali
-  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
+  // 1. Recupero o creazione del contenitore per le viste speciali
   let customContainer = $("customViewContainer");
+  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
 
-  // Se il contenitore per le griglie custom non esiste nell'HTML, lo creiamo al volo dopo la barra di ricerca
   if (!customContainer) {
     customContainer = document.createElement("div");
     customContainer.id = "customViewContainer";
-    customContainer.style.cssText = "margin-top: 15px; width: 100%;";
+    customContainer.style.cssText = "margin: 20px 0; padding: 15px; width: 100%; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);";
     
-    // Lo inseriamo subito dopo la barra di ricerca/filtro
+    // Lo posizioniamo subito sotto i pulsanti/filtri di ricerca
     const searchCard = $("search")?.closest(".card") || $("search")?.parentElement;
     if (searchCard && searchCard.parentNode) {
       searchCard.parentNode.insertBefore(customContainer, searchCard.nextSibling);
     } else if (tableContainer && tableContainer.parentNode) {
       tableContainer.parentNode.insertBefore(customContainer, tableContainer);
+    } else {
+      document.body.appendChild(customContainer);
     }
   }
 
   // 2. GESTIONE VISTE SPECIALI (Caramelle, Post Mix, Distributori)
   if (currentTab === 'candy' || currentTab === 'postmix' || currentTab === 'distributors') {
-    // Nascondiamo la tabella magazzino classico
+    // Nascondiamo la tabella classica
     if (tableContainer) tableContainer.style.display = "none";
-    // Mostriamo il contenitore custom
     customContainer.style.display = "block";
+    customContainer.innerHTML = ""; // Pulisce il contenuto precedente
 
-    if (currentTab === 'candy' && typeof renderCandyView === 'function') {
-      renderCandyView();
-    } else if (currentTab === 'postmix' && typeof renderPostMixView === 'function') {
-      renderPostMixView();
-    } else if (currentTab === 'distributors' && typeof renderDistributorsView === 'function') {
-      renderDistributorsView();
+    try {
+      if (currentTab === 'candy') {
+        if (typeof renderCandyView === 'function') {
+          renderCandyView();
+        } else {
+          customContainer.innerHTML = "<div class='alert alert-warning'>⚠️ Funzione <b>renderCandyView()</b> non trovata nel codice.</div>";
+        }
+      } else if (currentTab === 'postmix') {
+        if (typeof renderPostMixView === 'function') {
+          renderPostMixView();
+        } else {
+          customContainer.innerHTML = "<div class='alert alert-warning'>⚠️ Funzione <b>renderPostMixView()</b> non trovata nel codice.</div>";
+        }
+      } else if (currentTab === 'distributors') {
+        if (typeof renderDistributorsView === 'function') {
+          renderDistributorsView();
+        } else {
+          customContainer.innerHTML = "<div class='alert alert-warning'>⚠️ Funzione <b>renderDistributorsView()</b> non trovata nel codice.</div>";
+        }
+      }
+    } catch (err) {
+      console.error("Errore durante il rendering della vista speciale:", err);
+      customContainer.innerHTML = `<div class='alert alert-danger'>
+        <h4>Errore durante il caricamento della vista!</h4>
+        <p>${err.message}</p>
+      </div>`;
     }
     return;
   }
 
-  // 3. GESTIONE VISTA MAGAZZINO CLASSICO / RIEPILOGO
-  // Svuotiamo e nascondiamo le viste speciali
-  customContainer.innerHTML = "";
-  customContainer.style.display = "none";
-  // Mostriamo la tabella principale
+  // 3. VISTA MAGAZZINO CLASSICO / RIEPILOGO
+  if (customContainer) {
+    customContainer.innerHTML = "";
+    customContainer.style.display = "none";
+  }
   if (tableContainer) tableContainer.style.display = "block";
 
   const q = $("search") ? norm($("search").value) : "";
