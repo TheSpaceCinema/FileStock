@@ -177,6 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSetupFromStorage();
   loadCountsFromStorage();
   updateHeaderTitle();
+  injectPrintButton(); // Aggiunge dinamicamente il pulsante di stampa
 
   $("magFile").addEventListener("change", e => {
     const f = e.target.files[0];
@@ -210,6 +211,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("search").addEventListener("input", render);
 });
+
+/* --- FUNZIONE AGGIUNTA PULSANTE DI STAMPA --- */
+function injectPrintButton() {
+  const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
+  if ($("btnStampaInventario")) return;
+
+  const printBtn = document.createElement("button");
+  printBtn.id = "btnStampaInventario";
+  printBtn.className = "btn btn-primary";
+  printBtn.innerHTML = "🖨️ Stampa / Salva PDF";
+  printBtn.style.cssText = "background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px;";
+  printBtn.onclick = () => window.print();
+
+  // Inserisce il pulsante vicino al titolo o nella barra dei comandi principale se esiste
+  const titleEl = $("appTitle") || headerContainer;
+  if (titleEl && titleEl.parentNode) {
+    titleEl.parentNode.appendChild(printBtn);
+  } else {
+    document.body.insertBefore(printBtn, document.body.firstChild);
+  }
+}
 
 function toggleFilesSection() {
   const sec = $("filesSection");
@@ -786,7 +808,7 @@ function renderDistributorsView() {
 
   let html = `<tr><td style="padding: 20px; background: #f8f9fa;">`;
   html += `
-    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; align-items: center;">
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; align-items: center;" class="no-print">
       <div>
         <h3 style="margin: 0; color: #333;">Configurazione Griglie Distributori</h3>
         <p style="font-size: 0.9rem; color: #666; margin-top: 4px;">Scegli quanti distributori visualizzare in verticale e compila i campi.</p>
@@ -814,7 +836,6 @@ function renderDistributorsView() {
     }
     let dist = cfg.distributors[dIdx];
 
-    // Calcolo incasso totale del distributore
     let totalIncassoDist = 0;
     dist.rows.forEach(r => {
       let stockIni = n(r.stockIniziale);
@@ -828,7 +849,6 @@ function renderDistributorsView() {
 
     html += `
       <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 30px;">
-        <!-- Testata Distributore (come in foto) -->
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.9rem;">
           <tr>
             <td style="background: #e9ecef; font-weight: bold; width: 15%; text-align: right; padding: 6px;">Data:</td>
@@ -856,8 +876,7 @@ function renderDistributorsView() {
           </tr>
         </table>
 
-        <!-- Pulsante pulizia e Tabella righe (da B a M) -->
-        <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+        <div style="margin-bottom: 10px; display: flex; gap: 10px;" class="no-print">
           <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="clearDistributore(${dIdx})">PULISCI</button>
         </div>
 
@@ -940,7 +959,6 @@ function renderDistributorsView() {
   $("tbody").innerHTML = html;
 }
 
-/* Handler specifici per i Distributori */
 function updateDistributorsCount(val) {
   let cfg = getActiveCinemaDistributorConfig();
   cfg.distributorsCount = parseInt(val) || 2;
@@ -986,7 +1004,6 @@ function clearDistributore(dIdx) {
   }
 }
 
-/* --- FUNZIONI DI SUPPORTO PER INPUT MULTI-CAMPO --- */
 function renderMultiInput(whIdx, code, fieldType, unitSize) {
   const c = getCount(whIdx, code);
   const arr = c[fieldType] || [0];
@@ -997,7 +1014,7 @@ function renderMultiInput(whIdx, code, fieldType, unitSize) {
              oninput="updateCountField(${whIdx}, '${code}', '${fieldType}', ${idx}, this.value)">
     </div>
   `).join('') + `
-    <button onclick="addCountField(${whIdx}, '${code}', '${fieldType}')" style="padding: 2px 6px; font-size: 0.75rem; cursor:pointer;" title="Aggiungi campo">+</button>
+    <button onclick="addCountField(${whIdx}, '${code}', '${fieldType}')" style="padding: 2px 6px; font-size: 0.75rem; cursor:pointer;" title="Aggiungi campo" class="no-print">+</button>
   `;
 }
 
