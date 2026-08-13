@@ -1,7 +1,6 @@
 /* ==========================================================================
    APP STOCK MAGAZZINO CINEMA - FILE COMPLETO APP.JS
    ========================================================================== */
-
 let mag = [], size = [], rows = [], postMixProducts = [];
 let cinemaName = "TSC Beinasco";
 let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
@@ -76,6 +75,69 @@ function getCandyTotalKg() {
   return total;
 }
 
+/* --- FUNZIONE DI RENDERING CARAMELLE --- */
+function renderCandyView() {
+  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
+  if (tableContainer) tableContainer.style.display = "none";
+  let container = $("customViewContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "customViewContainer";
+    if (tableContainer && tableContainer.parentNode) tableContainer.parentNode.insertBefore(container, tableContainer);
+    else document.body.appendChild(container);
+  }
+  container.style.display = "block";
+  const cfg = getActiveCinemaCandyConfig();
+  let html = `<div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+    <h3 style="color:#d35400;">🍬 Gestione Griglie Caramelle - ${esc(cinemaName)}</h3>
+    <p>Totale Netto Calcolato: <b>${getCandyTotalKg().toFixed(2)} Kg</b></p><hr>`;
+  
+  cfg.blocks.forEach((b, bIdx) => {
+    html += `<div style="margin-bottom:20px;"><h4>${esc(b.name)}</h4>
+    <div style="display:grid; grid-template-columns: repeat(${b.columns}, minmax(60px, 1fr)); gap:5px; overflow-x:auto; padding:5px; background:#f8f9fa; border:1px solid #ddd; border-radius:4px;">`;
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.columns; c++) {
+        let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
+        html += `<div style="background:#fff; border:1px solid #ccc; padding:3px; text-align:center; font-size:0.75rem;">
+          <input type="number" step="any" value="${cell.weight}" style="width:100%; text-align:center; font-size:0.75rem;" 
+                 oninput="updateCandyCell(${bIdx}, ${r}, ${c}, this.value)" placeholder="Kg">
+        </div>`;
+      }
+    }
+    html += `</div></div>`;
+  });
+
+  html += `<h4 style="margin-top:20px;">📦 Buste e Scorte Sfuse</h4>
+  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">`;
+  cfg.buste.forEach((b, idx) => {
+    html += `<div style="background:#fff3e0; padding:8px; border-radius:4px; border:1px solid #ffe0b2;">
+      <b>Busta ${idx+1}</b><br>
+      Kg: <input type="number" step="any" value="${b.kg || ''}" style="width:60px;" oninput="updateCandyBusta(${idx}, 'kg', this.value)"> 
+      Sleeve: <input type="number" step="any" value="${b.sleeve || ''}" style="width:50px;" oninput="updateCandyBusta(${idx}, 'sleeve', this.value)">
+    </div>`;
+  });
+  html += `</div></div>`;
+  container.innerHTML = html;
+}
+
+function updateCandyCell(bIdx, r, c, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
+  if (!cfg.blocks[bIdx].gridValues[r]) cfg.blocks[bIdx].gridValues[r] = {};
+  if (!cfg.blocks[bIdx].gridValues[r][c]) cfg.blocks[bIdx].gridValues[r][c] = { weight: 0, taraIdx: 0 };
+  cfg.blocks[bIdx].gridValues[r][c].weight = n(val);
+  saveCandyConfig();
+  recalcKPIs();
+}
+
+function updateCandyBusta(idx, field, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg.buste[idx]) cfg.buste[idx] = { kg: 0, sleeve: 0 };
+  cfg.buste[idx][field] = n(val);
+  saveCandyConfig();
+  recalcKPIs();
+}
+
 /* --- CONFIGURAZIONE DINAMICA POST MIX --- */
 let postMixGridConfigs = JSON.parse(localStorage.getItem("postmix_grid_configs")) || {};
 function getActiveCinemaPostMixConfig() {
@@ -124,6 +186,54 @@ function getPostMixProductTotals() {
   return totals;
 }
 
+/* --- FUNZIONE DI RENDERING POST MIX --- */
+function renderPostMixView() {
+  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
+  if (tableContainer) tableContainer.style.display = "none";
+  let container = $("customViewContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "customViewContainer";
+    if (tableContainer && tableContainer.parentNode) tableContainer.parentNode.insertBefore(container, tableContainer);
+    else document.body.appendChild(container);
+  }
+  container.style.display = "block";
+  const cfg = getActiveCinemaPostMixConfig();
+  let html = `<div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+    <h3 style="color:#2980b9;">🥤 Gestione Post Mix - ${esc(cinemaName)}</h3><hr>`;
+  
+  cfg.blocks.forEach((b, bIdx) => {
+    html += `<div style="margin-bottom:20px;"><h4>${esc(b.name)}</h4>
+    <div style="display:grid; grid-template-columns: repeat(${b.columns}, minmax(130px, 1fr)); gap:8px; overflow-x:auto; padding:8px; background:#f4f6f7; border:1px solid #d5dbdb; border-radius:4px;">`;
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.columns; c++) {
+        let cell = b.gridValues?.[r]?.[c] || { prodName: "", weight: "" };
+        html += `<div style="background:#fff; border:1px solid #bdc3c7; padding:5px; border-radius:4px;">
+          <select style="width:100%; font-size:0.75rem; margin-bottom:4px;" onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, 'prodName', this.value)">
+            <option value="">-- Seleziona --</option>
+            ${postMixProducts.map(p => `<option value="${esc(p.name)}" ${cell.prodName === p.name ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+          </select>
+          <input type="number" step="any" value="${cell.weight}" style="width:100%; text-align:center; font-size:0.8rem;" 
+                 oninput="updatePostMixCell(${bIdx}, ${r}, ${c}, 'weight', this.value)" placeholder="Kg Lordi">
+        </div>`;
+      }
+    }
+    html += `</div></div>`;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function updatePostMixCell(bIdx, r, c, field, val) {
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
+  if (!cfg.blocks[bIdx].gridValues[r]) cfg.blocks[bIdx].gridValues[r] = {};
+  if (!cfg.blocks[bIdx].gridValues[r][c]) cfg.blocks[bIdx].gridValues[r][c] = { prodName: "", weight: 0 };
+  cfg.blocks[bIdx].gridValues[r][c][field] = field === 'weight' ? n(val) : val;
+  savePostMixConfig();
+  recalcKPIs();
+}
+
 /* --- CONFIGURAZIONE DISTRIBUTORI --- */
 let distributorGridConfigs = JSON.parse(localStorage.getItem("distributor_grid_configs")) || {};
 function getActiveCinemaDistributorConfig() {
@@ -164,17 +274,76 @@ function getDistributorsContaFinaleTotals() {
   return totals;
 }
 
+/* --- FUNZIONE DI RENDERING DISTRIBUTORI --- */
+function renderDistributorsView() {
+  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
+  if (tableContainer) tableContainer.style.display = "none";
+  let container = $("customViewContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "customViewContainer";
+    if (tableContainer && tableContainer.parentNode) tableContainer.parentNode.insertBefore(container, tableContainer);
+    else document.body.appendChild(container);
+  }
+  container.style.display = "block";
+  const cfg = getActiveCinemaDistributorConfig();
+  let html = `<div style="background:#fff; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+    <h3 style="color:#8e44ad;">🍫 Distributori Automatici - ${esc(cinemaName)}</h3><hr>`;
+  
+  cfg.distributors.forEach((d, dIdx) => {
+    html += `<div style="margin-bottom:25px; background:#fcf3cf; padding:10px; border-radius:6px; border:1px solid #f9e79f;">
+      <h4>${esc(d.name)} — Fondo Resti: €${d.fondoResti || 0}</h4>
+      <table style="width:100%; border-collapse:collapse; background:#fff; font-size:0.85rem;">
+        <thead>
+          <tr style="background:#f4d03f; color:#000;">
+            <th style="padding:4px; border:1px solid #ccc;">Prodotto</th>
+            <th style="padding:4px; border:1px solid #ccc;">Stock Iniziale</th>
+            <th style="padding:4px; border:1px solid #ccc;">Ins 1</th>
+            <th style="padding:4px; border:1px solid #ccc;">Ins 2</th>
+            <th style="padding:4px; border:1px solid #ccc;">Ins 3</th>
+            <th style="padding:4px; border:1px solid #ccc;">Conta Finale</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    d.rows.forEach((r, rIdx) => {
+      html += `<tr>
+        <td style="border:1px solid #ccc; padding:2px;"><input type="text" value="${esc(r.product)}" style="width:100%; border:none;" oninput="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)" placeholder="Nome Prodotto"></td>
+        <td style="border:1px solid #ccc; padding:2px;"><input type="number" value="${r.stockIniziale}" style="width:100%; text-align:center; border:none;" oninput="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>
+        <td style="border:1px solid #ccc; padding:2px;"><input type="number" value="${r.ins?.[0] || ''}" style="width:100%; text-align:center; border:none;" oninput="updateDistIns(${dIdx}, ${rIdx}, 0, this.value)"></td>
+        <td style="border:1px solid #ccc; padding:2px;"><input type="number" value="${r.ins?.[1] || ''}" style="width:100%; text-align:center; border:none;" oninput="updateDistIns(${dIdx}, ${rIdx}, 1, this.value)"></td>
+        <td style="border:1px solid #ccc; padding:2px;"><input type="number" value="${r.ins?.[2] || ''}" style="width:100%; text-align:center; border:none;" oninput="updateDistIns(${dIdx}, ${rIdx}, 2, this.value)"></td>
+        <td style="border:1px solid #ccc; padding:2px; background:#e8daef;"><input type="number" value="${r.contaFinale}" style="width:100%; text-align:center; border:none; font-weight:bold;" oninput="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function updateDistRow(dIdx, rIdx, field, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  cfg.distributors[dIdx].rows[rIdx][field] = val;
+  saveDistributorConfig();
+  recalcKPIs();
+}
+
+function updateDistIns(dIdx, rIdx, insIdx, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (!cfg.distributors[dIdx].rows[rIdx].ins) cfg.distributors[dIdx].rows[rIdx].ins = ["","","","",""];
+  cfg.distributors[dIdx].rows[rIdx].ins[insIdx] = val;
+  saveDistributorConfig();
+  recalcKPIs();
+}
+
 const $ = id => document.getElementById(id);
 document.addEventListener("DOMContentLoaded", () => {
   loadSetupFromStorage();
   loadCountsFromStorage();
   updateHeaderTitle();
   injectExcelTemplateButton();
-
-  // Rimozione di eventuali duplicati in basso
   const bottomExportBtns = document.querySelectorAll("button[onclick*='export'], .btn-export");
   bottomExportBtns.forEach(btn => btn.remove());
-
   if ($("magFile")) {
     $("magFile").addEventListener("change", e => {
       const f = e.target.files[0];
@@ -216,31 +385,24 @@ document.addEventListener("DOMContentLoaded", () => {
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
   if ($("exportTemplateBtnContainer")) return;
-
   const btnContainer = document.createElement("div");
   btnContainer.id = "exportTemplateBtnContainer";
   btnContainer.className = "no-print";
   btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
-
-  // 1. Pulsante Blu
   const exportTemplateBtn = document.createElement("button");
   exportTemplateBtn.id = "btnExportExcelTemplate";
   exportTemplateBtn.className = "btn btn-secondary";
   exportTemplateBtn.innerHTML = "📋 Esporta Excel (Template Vuoto)";
   exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportTemplateBtn.onclick = () => handleDynamicExport(true);
-
-  // 2. Pulsante Verde Unico
   const exportCountsBtn = document.createElement("button");
   exportCountsBtn.id = "btnExportExcelCounts";
   exportCountsBtn.className = "btn btn-success";
   exportCountsBtn.innerHTML = "📊 Esporta Report (Conteggi Rilevati)";
   exportCountsBtn.style.cssText = "background: #27ae60; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportCountsBtn.onclick = () => handleDynamicExport(false);
-
   btnContainer.appendChild(exportTemplateBtn);
   btnContainer.appendChild(exportCountsBtn);
-
   const titleEl = $("appTitle") || headerContainer;
   if (titleEl && titleEl.parentNode) {
     titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
@@ -249,7 +411,6 @@ function injectExcelTemplateButton() {
   }
 }
 
-/* --- GESTORE DINAMICO ESPORTAZIONE IN BASE AL TAB ATTIVO --- */
 function handleDynamicExport(isEmptyTemplate) {
   if (currentTab === 'candy') {
     exportCandyGridExcel(isEmptyTemplate);
@@ -266,7 +427,6 @@ function handleDynamicExport(isEmptyTemplate) {
   }
 }
 
-/* --- ESPORTAZIONE SPECIFICA CARAMELLE (GRIGLIE + BUSTE) --- */
 function exportCandyGridExcel(isEmpty) {
   const cfg = getActiveCinemaCandyConfig();
   let html = `
@@ -288,7 +448,6 @@ function exportCandyGridExcel(isEmpty) {
         <tr><td colspan="15" class="title-row">SCHEDA CARAMELLE — ${esc(cinemaName)} ${isEmpty ? '(TEMPLATE VUOTO)' : '(CONTEGGI)'}</td></tr>
       </table>
   `;
-
   cfg.blocks.forEach(b => {
     html += `<table><tr><td colspan="${b.columns}" class="block-title">${esc(b.name)}</td></tr>`;
     for (let r = 0; r < b.rows; r++) {
@@ -308,7 +467,6 @@ function exportCandyGridExcel(isEmpty) {
     }
     html += `</table><br/>`;
   });
-
   html += `
     <table>
       <tr><td colspan="4" class="block-title">📦 BUSTE E SCORTE SFUSE</td></tr>
@@ -321,11 +479,9 @@ function exportCandyGridExcel(isEmpty) {
     html += `<tr><td>Busta ${idx + 1}</td><td>${kg}</td><td>${sl}</td><td>${tot}</td></tr>`;
   });
   html += `</table></body></html>`;
-
   downloadExcelBlob(html, `Caramelle_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
 
-/* --- ESPORTAZIONE SPECIFICA POST MIX --- */
 function exportPostMixGridExcel(isEmpty) {
   const cfg = getActiveCinemaPostMixConfig();
   let html = `
@@ -346,7 +502,6 @@ function exportPostMixGridExcel(isEmpty) {
         <tr><td colspan="10" class="title-row">SCHEDA POST MIX — ${esc(cinemaName)} ${isEmpty ? '(TEMPLATE VUOTO)' : '(CONTEGGI)'}</td></tr>
       </table>
   `;
-
   cfg.blocks.forEach(b => {
     html += `<table><tr><td colspan="${b.columns}" class="block-title">${esc(b.name)}</td></tr>`;
     for (let r = 0; r < b.rows; r++) {
@@ -364,11 +519,9 @@ function exportPostMixGridExcel(isEmpty) {
     html += `</table><br/>`;
   });
   html += `</body></html>`;
-
   downloadExcelBlob(html, `PostMix_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
 
-/* --- ESPORTAZIONE SPECIFICA DISTRIBUTORI --- */
 function exportDistributorsExcel(isEmpty) {
   const cfg = getActiveCinemaDistributorConfig();
   let html = `
@@ -389,7 +542,6 @@ function exportDistributorsExcel(isEmpty) {
         <tr><td colspan="10" class="title-row">SCHEDA DISTRIBUTORI AUTOMATICI — ${esc(cinemaName)} ${isEmpty ? '(TEMPLATE VUOTO)' : '(CONTEGGI)'}</td></tr>
       </table>
   `;
-
   cfg.distributors.forEach(d => {
     html += `
       <table>
@@ -413,7 +565,6 @@ function exportDistributorsExcel(isEmpty) {
     });
     html += `</table><br/>`;
   });
-
   html += `</body></html>`;
   downloadExcelBlob(html, `Distributori_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
@@ -430,32 +581,27 @@ function downloadExcelBlob(htmlContent, fileName) {
   URL.revokeObjectURL(url);
 }
 
-/* --- ESPORTAZIONE INVENTARIO REALE COMPLETO CON CONTEGGI ( MAGAZZINO CLASSICO ) --- */
 function exportCurrentInventoryToExcel() {
   if (!rows || rows.length === 0) {
     alert("Nessun dato prodotto caricato da esportare!");
     return;
   }
-
   let activeMagName = cinemaName;
   if (currentTab === 'tot') {
     activeMagName = `${cinemaName} - RIEPILOGO TOTALE`;
   } else if (typeof currentTab === 'number' && warehouses[currentTab]) {
     activeMagName = `${cinemaName} - ${warehouses[currentTab]}`;
   }
-
   let totalItems = rows.length;
   let totalAtteso = 0;
   let totalRilevato = 0;
   let totalDiffValore = 0;
-
   rows.forEach(r => {
     totalAtteso += (r.atteso || 0);
     const eff = getGlobalRilevato(r.code, r);
     totalRilevato += eff;
     totalDiffValore += (eff - (r.atteso || 0)) * (r.standardCost || 0);
   });
-
   let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -518,7 +664,6 @@ function exportCurrentInventoryToExcel() {
           <th>Diff. Valore</th>
         </tr>
   `;
-
   rows.forEach((r, idx) => {
     let totBoxLocal = 0, totSleeveLocal = 0, totSfusoLocal = 0;
     if (currentTab === 'tot') {
@@ -534,15 +679,12 @@ function exportCurrentInventoryToExcel() {
       totSleeveLocal = sumArr(c.sleeve);
       totSfusoLocal = sumArr(c.sfuso);
     }
-
     const baseRilevato = (totBoxLocal * (r.boxSize || 0)) + (totSleeveLocal * (r.sleeveSize || 0)) + totSfusoLocal;
     const kitPart = getKitContributionDetail(r.name, r.code);
     const effettivoTotaleComplesso = getGlobalRilevato(r.code, r);
     const diffTotale = effettivoTotaleComplesso - (r.atteso || 0);
     const diffValore = diffTotale * (r.standardCost || 0);
-
     const rowClass = idx % 2 === 0 ? 'row-even' : 'row-odd';
-
     html += `
       <tr class="${rowClass}">
         <td class="text-left num-bold">${esc(r.name)}</td>
@@ -565,25 +707,21 @@ function exportCurrentInventoryToExcel() {
       </tr>
     `;
   });
-
   html += `</table></body></html>`;
   downloadExcelBlob(html, `Report_Inventario_${activeMagName.replace(/[^a-zA-Z0-9-_]/g, "_")}.xls`);
 }
 
-/* --- ESPORTAZIONE TEMPLATE CONTEGGIO VUOTO IN EXCEL ( MAGAZZINO CLASSICO ) --- */
 function exportEmptyTemplateToExcel() {
   if (!rows || rows.length === 0) {
     alert("Nessun prodotto caricato!");
     return;
   }
-
   let activeMagName = cinemaName;
   if (typeof currentTab === 'number' && warehouses[currentTab]) {
     activeMagName = `${cinemaName} - ${warehouses[currentTab]}`;
   } else {
     activeMagName = `${cinemaName} - Template Conteggio`;
   }
-
   let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -618,12 +756,10 @@ function exportEmptyTemplateToExcel() {
           <th>Valore Atteso</th>
         </tr>
   `;
-
   rows.forEach((r, idx) => {
     const rowClass = idx % 2 === 0 ? 'row-even' : 'row-odd';
     const hasBox = r.boxSize > 0;
     const hasSleeve = r.sleeveSize > 0;
-
     html += `
       <tr class="${rowClass}">
         <td class="text-left" style="font-weight:bold;">${esc(r.name)}</td>
@@ -637,7 +773,6 @@ function exportEmptyTemplateToExcel() {
       </tr>
     `;
   });
-
   html += `</table></body></html>`;
   downloadExcelBlob(html, `Template_Conteggio_${activeMagName.replace(/[^a-zA-Z0-9-_]/g, "_")}.xls`);
 }
@@ -1058,33 +1193,29 @@ function getGlobalRilevato(code, r) {
   }
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
+
 function render() {
   if (currentTab === 'setup') return;
 
-  // 1. SCHEDE SPECIALI (Caramelle, Post Mix, Distributori)
-  // Iniettano direttamente il loro HTML nel contenitore principale o chiamano i loro render
   if (currentTab === 'candy') {
-    if (typeof renderCandyView === 'function') renderCandyView();
+    renderCandyView();
     return;
   }
   if (currentTab === 'postmix') {
-    if (typeof renderPostMixView === 'function') renderPostMixView();
+    renderPostMixView();
     return;
   }
   if (currentTab === 'distributors') {
-    if (typeof renderDistributorsView === 'function') renderDistributorsView();
+    renderDistributorsView();
     return;
   }
 
-  // Se torniamo su un magazzino classico, ci assicuriamo che il contenitore custom (se esisteva) sia pulito
   const customContainer = $("customViewContainer");
-  if (customContainer) customContainer.innerHTML = "";
+  if (customContainer) customContainer.style.display = "none";
 
-  // Assicuriamoci che la tabella del magazzino sia visibile
   const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
   if (tableContainer) tableContainer.style.display = "block";
 
-  // 2. MAGAZZINO CLASSICO / RIEPILOGO
   const q = $("search") ? norm($("search").value) : "";
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   if ($("count")) $("count").textContent = `${data.length} prodotti`;
@@ -1173,6 +1304,7 @@ function render() {
   }
   recalcKPIs();
 }
+
 function renderMultiInput(whIdx, code, fieldType, unitSize) {
   const c = getCount(whIdx, code);
   const arr = c[fieldType] || [0];
@@ -1192,6 +1324,7 @@ function renderMultiInput(whIdx, code, fieldType, unitSize) {
     <button onclick="addCountField(${whIdx}, '${code}', '${fieldType}')" style="padding: 2px 6px; font-size: 0.75rem; cursor:pointer;" title="Aggiungi campo" class="no-print">+</button>
   `;
 }
+
 function updateCountField(whIdx, code, fieldType, idx, val) {
   const c = getCount(whIdx, code);
   c[fieldType][idx] = n(val);
@@ -1219,12 +1352,14 @@ function updateCountField(whIdx, code, fieldType, idx, val) {
   }
   recalcKPIs();
 }
+
 function addCountField(whIdx, code, fieldType) {
   const c = getCount(whIdx, code);
   c[fieldType].push(0);
   saveCountsToStorage();
   render();
 }
+
 function recalcKPIs() {
   let totAtteso = 0, totRilevato = 0, totDiffValore = 0;
   rows.forEach(r => {
