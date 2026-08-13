@@ -420,30 +420,68 @@ function renderDistributorsView() {
   thead.innerHTML = `<tr><th colspan="10" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
 
   let html = `<tr><td colspan="10" style="padding:15px; background:#f5eef8;">`;
+  
   cfg.distributors.forEach((d, dIdx) => {
     html += `<div style="background:white; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #d2b4de;">
-              <h5 style="color:#8e44ad; margin-bottom:8px;">${esc(d.name)} — Fondo Resti: €${d.fondoResti}</h5>
+              <h5 style="color:#8e44ad; margin-bottom:8px;">${esc(d.name)} — Data: <input type="text" value="${esc(d.date || '')}" placeholder="13/08/2026" style="padding:2px 6px; width:100px; border:1px solid #ccc; border-radius:3px;" onchange="updateDistMeta(${dIdx}, 'date', this.value)"> — Fondo Resti: €<input type="number" value="${d.fondoResti}" style="padding:2px 6px; width:60px; border:1px solid #ccc; border-radius:3px;" onchange="updateDistMeta(${dIdx}, 'fondoResti', this.value)"></h5>
               <table style="width:100%; font-size:0.8rem; border-collapse:collapse;">
                 <thead>
                   <tr style="background:#ebdef0;">
-                    <th style="padding:4px;">Prodotto</th>
-                    <th style="padding:4px;">Stock Iniziale</th>
-                    <th style="padding:4px;">Conta Finale</th>
+                    <th style="padding:5px; border:1px solid #d2b4de;">Prodotto</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:90px;">Stock Iniziale</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 1</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 2</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 3</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 4</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:55px;">Ins 5</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:90px;">Conta Finale</th>
+                    <th style="padding:5px; border:1px solid #d2b4de; width:80px;">Prezzo (€)</th>
                   </tr>
                 </thead>
                 <tbody>`;
+                
     d.rows.forEach((r, rIdx) => {
       html += `<tr>
-                <td><input type="text" value="${esc(r.product)}" placeholder="Nome Prodotto" style="width:100%; border:1px solid #ddd;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)"></td>
-                <td><input type="number" value="${r.stockIniziale}" style="width:100%; border:1px solid #ddd; text-align:center;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>
-                <td><input type="number" value="${r.contaFinale}" style="width:100%; border:1px solid #ddd; text-align:center; font-weight:bold;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
+                <td style="padding:3px; border:1px solid #eee;"><input type="text" value="${esc(r.product)}" placeholder="Nome Prodotto" style="width:100%; border:1px solid #ddd; padding:4px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)"></td>
+                <td style="padding:3px; border:1px solid #eee;"><input type="number" value="${r.stockIniziale}" style="width:100%; border:1px solid #ddd; text-align:center; padding:4px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>`;
+                
+      // Genera i 5 campi di reintegro (Ins 1 - Ins 5)
+      for(let i=0; i<5; i++) {
+        let insVal = (r.ins && r.ins[i]) !== undefined ? r.ins[i] : "";
+        html += `<td style="padding:3px; border:1px solid #eee;"><input type="number" value="${insVal}" style="width:100%; border:1px solid #ddd; text-align:center; padding:4px;" onchange="updateDistIns(${dIdx}, ${rIdx}, ${i}, this.value)"></td>`;
+      }
+
+      html += `
+                <td style="padding:3px; border:1px solid #eee;"><input type="number" value="${r.contaFinale}" style="width:100%; border:1px solid #ddd; text-align:center; font-weight:bold; padding:4px; background:#fcf3cf;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
+                <td style="padding:3px; border:1px solid #eee;"><input type="number" step="any" value="${r.prezzoVendita || ''}" placeholder="0.00" style="width:100%; border:1px solid #ddd; text-align:center; padding:4px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'prezzoVendita', this.value)"></td>
               </tr>`;
     });
+    
     html += `</tbody></table></div>`;
   });
 
   html += `</td></tr>`;
   container.innerHTML = html;
+}
+
+// Funzioni di supporto aggiuntive per i metadati e i reintegri multipli dei distributori
+function updateDistMeta(dIdx, key, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx]) {
+    cfg.distributors[dIdx][key] = val;
+    saveDistributorConfig();
+  }
+}
+
+function updateDistIns(dIdx, rIdx, insIdx, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
+    if (!cfg.distributors[dIdx].rows[rIdx].ins) {
+      cfg.distributors[dIdx].rows[rIdx].ins = ["", "", "", "", ""];
+    }
+    cfg.distributors[dIdx].rows[rIdx].ins[insIdx] = val;
+    saveDistributorConfig();
+  }
 }
 
 function updateDistRow(dIdx, rIdx, key, val) {
