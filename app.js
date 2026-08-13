@@ -1061,23 +1061,48 @@ function getGlobalRilevato(code, r) {
 function render() {
   if (currentTab === 'setup') return;
 
-  // Riferimenti ai container principali
+  // 1. Identifichiamo la tabella e cerchiamo/creiamo il contenitore per le viste speciali
   const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
-  const customViewContainer = $("customViewContainer"); // Container per le viste speciali
+  let customContainer = $("customViewContainer");
 
-  // VISTE SPECIALI: Nascondiamo la tabella classica del magazzino
-  if (currentTab === 'candy' || currentTab === 'postmix' || currentTab === 'distributors') {
-    if (tableContainer) tableContainer.style.display = "none";
+  // Se il contenitore per le griglie custom non esiste nell'HTML, lo creiamo al volo dopo la barra di ricerca
+  if (!customContainer) {
+    customContainer = document.createElement("div");
+    customContainer.id = "customViewContainer";
+    customContainer.style.cssText = "margin-top: 15px; width: 100%;";
     
-    if (currentTab === 'candy' && typeof renderCandyView === 'function') renderCandyView();
-    if (currentTab === 'postmix' && typeof renderPostMixView === 'function') renderPostMixView();
-    if (currentTab === 'distributors' && typeof renderDistributorsView === 'function') renderDistributorsView();
+    // Lo inseriamo subito dopo la barra di ricerca/filtro
+    const searchCard = $("search")?.closest(".card") || $("search")?.parentElement;
+    if (searchCard && searchCard.parentNode) {
+      searchCard.parentNode.insertBefore(customContainer, searchCard.nextSibling);
+    } else if (tableContainer && tableContainer.parentNode) {
+      tableContainer.parentNode.insertBefore(customContainer, tableContainer);
+    }
+  }
+
+  // 2. GESTIONE VISTE SPECIALI (Caramelle, Post Mix, Distributori)
+  if (currentTab === 'candy' || currentTab === 'postmix' || currentTab === 'distributors') {
+    // Nascondiamo la tabella magazzino classico
+    if (tableContainer) tableContainer.style.display = "none";
+    // Mostriamo il contenitore custom
+    customContainer.style.display = "block";
+
+    if (currentTab === 'candy' && typeof renderCandyView === 'function') {
+      renderCandyView();
+    } else if (currentTab === 'postmix' && typeof renderPostMixView === 'function') {
+      renderPostMixView();
+    } else if (currentTab === 'distributors' && typeof renderDistributorsView === 'function') {
+      renderDistributorsView();
+    }
     return;
   }
 
-  // VISTA MAGAZZINO CLASSICO / RIEPILOGO: Mostriamo la tabella
+  // 3. GESTIONE VISTA MAGAZZINO CLASSICO / RIEPILOGO
+  // Svuotiamo e nascondiamo le viste speciali
+  customContainer.innerHTML = "";
+  customContainer.style.display = "none";
+  // Mostriamo la tabella principale
   if (tableContainer) tableContainer.style.display = "block";
-  if (customViewContainer) customViewContainer.innerHTML = ""; // Pulisce viste speciali
 
   const q = $("search") ? norm($("search").value) : "";
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
