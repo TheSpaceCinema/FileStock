@@ -1061,70 +1061,30 @@ function getGlobalRilevato(code, r) {
 function render() {
   if (currentTab === 'setup') return;
 
-  // 1. Recupero o creazione del contenitore per le viste speciali
-  let customContainer = $("customViewContainer");
-  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
-
-  if (!customContainer) {
-    customContainer = document.createElement("div");
-    customContainer.id = "customViewContainer";
-    customContainer.style.cssText = "margin: 20px 0; padding: 15px; width: 100%; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);";
-    
-    // Lo posizioniamo subito sotto i pulsanti/filtri di ricerca
-    const searchCard = $("search")?.closest(".card") || $("search")?.parentElement;
-    if (searchCard && searchCard.parentNode) {
-      searchCard.parentNode.insertBefore(customContainer, searchCard.nextSibling);
-    } else if (tableContainer && tableContainer.parentNode) {
-      tableContainer.parentNode.insertBefore(customContainer, tableContainer);
-    } else {
-      document.body.appendChild(customContainer);
-    }
+  // 1. SCHEDE SPECIALI (Caramelle, Post Mix, Distributori)
+  // Iniettano direttamente il loro HTML nel contenitore principale o chiamano i loro render
+  if (currentTab === 'candy') {
+    if (typeof renderCandyView === 'function') renderCandyView();
+    return;
   }
-
-  // 2. GESTIONE VISTE SPECIALI (Caramelle, Post Mix, Distributori)
-  if (currentTab === 'candy' || currentTab === 'postmix' || currentTab === 'distributors') {
-    // Nascondiamo la tabella classica
-    if (tableContainer) tableContainer.style.display = "none";
-    customContainer.style.display = "block";
-    customContainer.innerHTML = ""; // Pulisce il contenuto precedente
-
-    try {
-      if (currentTab === 'candy') {
-        if (typeof renderCandyView === 'function') {
-          renderCandyView();
-        } else {
-          customContainer.innerHTML = "<div class='alert alert-warning'>⚠️ Funzione <b>renderCandyView()</b> non trovata nel codice.</div>";
-        }
-      } else if (currentTab === 'postmix') {
-        if (typeof renderPostMixView === 'function') {
-          renderPostMixView();
-        } else {
-          customContainer.innerHTML = "<div class='alert alert-warning'>⚠️ Funzione <b>renderPostMixView()</b> non trovata nel codice.</div>";
-        }
-      } else if (currentTab === 'distributors') {
-        if (typeof renderDistributorsView === 'function') {
-          renderDistributorsView();
-        } else {
-          customContainer.innerHTML = "<div class='alert alert-warning'>⚠️ Funzione <b>renderDistributorsView()</b> non trovata nel codice.</div>";
-        }
-      }
-    } catch (err) {
-      console.error("Errore durante il rendering della vista speciale:", err);
-      customContainer.innerHTML = `<div class='alert alert-danger'>
-        <h4>Errore durante il caricamento della vista!</h4>
-        <p>${err.message}</p>
-      </div>`;
-    }
+  if (currentTab === 'postmix') {
+    if (typeof renderPostMixView === 'function') renderPostMixView();
+    return;
+  }
+  if (currentTab === 'distributors') {
+    if (typeof renderDistributorsView === 'function') renderDistributorsView();
     return;
   }
 
-  // 3. VISTA MAGAZZINO CLASSICO / RIEPILOGO
-  if (customContainer) {
-    customContainer.innerHTML = "";
-    customContainer.style.display = "none";
-  }
+  // Se torniamo su un magazzino classico, ci assicuriamo che il contenitore custom (se esisteva) sia pulito
+  const customContainer = $("customViewContainer");
+  if (customContainer) customContainer.innerHTML = "";
+
+  // Assicuriamoci che la tabella del magazzino sia visibile
+  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
   if (tableContainer) tableContainer.style.display = "block";
 
+  // 2. MAGAZZINO CLASSICO / RIEPILOGO
   const q = $("search") ? norm($("search").value) : "";
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   if ($("count")) $("count").textContent = `${data.length} prodotti`;
