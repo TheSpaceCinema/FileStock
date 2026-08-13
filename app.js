@@ -222,23 +222,65 @@ function renderCandyView() {
   
   let html = `<tr><td colspan="10" style="padding:20px; background:#fff3e0;">`;
   
-  // Riepilogo Totale e Configurazione Tare in alto
+  // Sezione Superiore: Totale, 4 Caselle Tare, Menù a tendina Blocco e Orientamento
   html += `
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:20px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
-      <div>
-        <h3 style="color:#d35400; margin-bottom:5px;">Totale Netto Caramelle: <span id="candyTotalKgDisplay">${getCandyTotalKg().toFixed(2)} Kg</span></h3>
-        <p style="font-size:0.85rem; color:#666;">Seleziona la tara dal menù a tendina sopra ogni cella o configura i valori delle tare e la griglia.</p>
+    <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+        <h3 style="color:#d35400; margin:0;">Totale Netto Caramelle: <span id="candyTotalKgDisplay">${getCandyTotalKg().toFixed(2)} Kg</span></h3>
       </div>
-      <div>
-        <button class="btn btn-primary" onclick="openCandySettingsModal()" style="background:#e67e22; border:none;">⚙️ Configura Righe, Colonne e Tare</button>
+      
+      <!-- 4 Caselle di testo per le tare -->
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <span style="font-size:0.85rem; font-weight:bold; color:#d35400;">Tare (Kg):</span>
+        ${[0,1,2,3].map(i => `
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:0.75rem; color:#666;">T${i+1}:</span>
+            <input type="number" step="any" value="${cfg.tares[i] !== undefined ? cfg.tares[i] : ''}" placeholder="0.00" 
+              style="width:70px; padding:4px; text-align:center; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;"
+              oninput="updateCandyTareInput(${i}, this.value)">
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Menù a tendina numero blocchi e orientamento -->
+      <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap; border-top:1px solid #eee; padding-top:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:0.85rem; font-weight:bold; color:#666;">Numero Blocchi:</label>
+          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateCandyBlocksCount(this.value)">
+            ${[1, 2, 3, 4, 5, 6].map(nOpt => `<option value="${nOpt}" ${cfg.blocksCount === nOpt ? 'selected' : ''}>${nOpt} Blocchi</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:0.85rem; font-weight:bold; color:#666;">Orientamento Griglia:</label>
+          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateCandyOrientation(this.value)">
+            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>Verticale</option>
+            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>Orizzontale</option>
+          </select>
+        </div>
       </div>
     </div>
   `;
 
-  // Render dei Blocchi di vaschette con menù a tendina tare per cella
+  // Render dei Blocchi con menù a tendina per Righe e Colonne in ciascuno
   cfg.blocks.forEach((b, bIdx) => {
     html += `<div style="margin-top:15px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
-              <h5 style="color:#e67e22; margin-bottom:10px;">${esc(b.name)} — (${b.rows} Righe × ${b.columns} Colonne)</h5>
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+                <h5 style="color:#e67e22; margin:0;">${esc(b.name)}</h5>
+                <div style="display:flex; gap:15px; align-items:center;">
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <label style="font-size:0.8rem; color:#666;">Righe:</label>
+                    <select style="padding:2px 6px; font-size:0.8rem; border:1px solid #ccc; border-radius:4px;" onchange="updateCandyBlockRows(${bIdx}, this.value)">
+                      ${Array(10).fill(0).map((_, i) => `<option value="${i+1}" ${b.rows === (i+1) ? 'selected' : ''}>${i+1}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <label style="font-size:0.8rem; color:#666;">Colonne:</label>
+                    <select style="padding:2px 6px; font-size:0.8rem; border:1px solid #ccc; border-radius:4px;" onchange="updateCandyBlockCols(${bIdx}, this.value)">
+                      ${Array(35).fill(0).map((_, i) => `<option value="${i+1}" ${b.columns === (i+1) ? 'selected' : ''}>${i+1}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+              </div>
               <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 12)}, 1fr); gap:8px; margin-top:8px; overflow-x:auto; padding-bottom:5px;">`;
     
     for(let r=0; r<b.rows; r++) {
@@ -290,6 +332,54 @@ function renderCandyView() {
   container.innerHTML = html;
 }
 
+function updateCandyTareInput(idx, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg.tares) cfg.tares = [0.37, 0.72, 0.50, 1.00];
+  cfg.tares[idx] = n(val);
+  saveCandyConfig();
+  updateCandyTotalUI();
+}
+
+function updateCandyBlocksCount(countVal) {
+  const cfg = getActiveCinemaCandyConfig();
+  let count = parseInt(countVal) || 2;
+  cfg.blocksCount = count;
+  while (cfg.blocks.length < count) {
+    cfg.blocks.push({ id: `block_${cfg.blocks.length}`, name: `📦 Blocco ${cfg.blocks.length + 1}`, columns: 10, rows: 2, gridValues: {} });
+  }
+  cfg.blocks = cfg.blocks.slice(0, count);
+  saveCandyConfig();
+  renderCandyView();
+  recalcKPIs();
+}
+
+function updateCandyOrientation(orient) {
+  const cfg = getActiveCinemaCandyConfig();
+  cfg.orientation = orient;
+  saveCandyConfig();
+  renderCandyView();
+}
+
+function updateCandyBlockRows(bIdx, rowsVal) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (cfg.blocks[bIdx]) {
+    cfg.blocks[bIdx].rows = Math.max(1, parseInt(rowsVal) || 1);
+    saveCandyConfig();
+    renderCandyView();
+    recalcKPIs();
+  }
+}
+
+function updateCandyBlockCols(bIdx, colsVal) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (cfg.blocks[bIdx]) {
+    cfg.blocks[bIdx].columns = Math.max(1, parseInt(colsVal) || 1);
+    saveCandyConfig();
+    renderCandyView();
+    recalcKPIs();
+  }
+}
+
 function updateCandyCellWeight(bIdx, r, c, val) {
   const cfg = getActiveCinemaCandyConfig();
   if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
@@ -325,35 +415,6 @@ function updateCandyTotalUI() {
   if (totalEl) {
     totalEl.textContent = `${getCandyTotalKg().toFixed(2)} Kg`;
   }
-  recalcKPIs();
-}
-
-function openCandySettingsModal() {
-  const cfg = getActiveCinemaCandyConfig();
-  let taresStr = prompt("Inserisci i valori delle tare separati da virgola (es. 0.37, 0.72, 0.50, 1.00):", cfg.tares.join(", "));
-  if (taresStr === null) return;
-  
-  let newTares = taresStr.split(",").map(x => n(x.trim())).filter(x => x >= 0);
-  if (newTares.length > 0) cfg.tares = newTares;
-
-  let blocksCount = prompt("Quanti blocchi/espositori di caramelle vuoi gestire?", cfg.blocks.length);
-  if (blocksCount !== null && parseInt(blocksCount) > 0) {
-    let count = parseInt(blocksCount);
-    while (cfg.blocks.length < count) {
-      cfg.blocks.push({ id: `block_${cfg.blocks.length}`, name: `📦 Blocco ${cfg.blocks.length + 1}`, columns: 10, rows: 2, gridValues: {} });
-    }
-    cfg.blocks = cfg.blocks.slice(0, count);
-    
-    cfg.blocks.forEach((b, idx) => {
-      let r = prompt(`Inserisci il numero di righe per "${b.name}":`, b.rows);
-      let c = prompt(`Inserisci il numero di colonne per "${b.name}":`, b.columns);
-      if (r !== null) b.rows = Math.max(1, parseInt(r) || 1);
-      if (c !== null) b.columns = Math.max(1, parseInt(c) || 1);
-    });
-  }
-
-  saveCandyConfig();
-  renderCandyView();
   recalcKPIs();
 }
 
