@@ -1060,18 +1060,33 @@ function getGlobalRilevato(code, r) {
 }
 function render() {
   if (currentTab === 'setup') return;
-  if (currentTab === 'candy') { if (typeof renderCandyView === 'function') renderCandyView(); return; }
-  if (currentTab === 'postmix') { if (typeof renderPostMixView === 'function') renderPostMixView(); return; }
-  if (currentTab === 'distributors') { if (typeof renderDistributorsView === 'function') renderDistributorsView(); return; }
-  
+
+  // Riferimenti ai container principali
+  const tableContainer = document.querySelector(".table-responsive") || $("tbody")?.closest("table")?.parentElement;
+  const customViewContainer = $("customViewContainer"); // Container per le viste speciali
+
+  // VISTE SPECIALI: Nascondiamo la tabella classica del magazzino
+  if (currentTab === 'candy' || currentTab === 'postmix' || currentTab === 'distributors') {
+    if (tableContainer) tableContainer.style.display = "none";
+    
+    if (currentTab === 'candy' && typeof renderCandyView === 'function') renderCandyView();
+    if (currentTab === 'postmix' && typeof renderPostMixView === 'function') renderPostMixView();
+    if (currentTab === 'distributors' && typeof renderDistributorsView === 'function') renderDistributorsView();
+    return;
+  }
+
+  // VISTA MAGAZZINO CLASSICO / RIEPILOGO: Mostriamo la tabella
+  if (tableContainer) tableContainer.style.display = "block";
+  if (customViewContainer) customViewContainer.innerHTML = ""; // Pulisce viste speciali
+
   const q = $("search") ? norm($("search").value) : "";
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   if ($("count")) $("count").textContent = `${data.length} prodotti`;
   const isTotTab = (currentTab === 'tot');
-  
+
   if ($("thead")) {
     $("thead").innerHTML = `
-      <tr style="position: sticky; top: 0; z-index: 20; background: #212529;">
+      <tr>
         <th colspan="2" style="background: #212529; color: white;">PRODOTTO</th>
         <th colspan="3" style="background: #343a40; color: white;">REPORT MAGAZZINO</th>
         <th colspan="2" class="grp-box" style="background: #e3f2fd; color: #0d47a1;">BOX</th>
@@ -1080,7 +1095,7 @@ function render() {
         <th colspan="5" style="background: #212529; color: white;">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
         <th colspan="2" class="grp-valore" style="background: #ffebee; color: #b71c1c;">VALORIZZAZIONE</th>
       </tr>
-      <tr style="position: sticky; top: 41px; z-index: 20; background: #343a40; color: white;">
+      <tr style="background: #343a40; color: white;">
         <th style="background: #343a40; color: white;">Prodotto</th>
         <th style="background: #343a40; color: white;">U.M.</th>
         <th class="num" style="background: #343a40; color: white;">Iniziale</th>
