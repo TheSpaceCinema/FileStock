@@ -1,5 +1,5 @@
 /* ==========================================================================
-   APP STOCK MAGAZZINO CINEMA - FILE COMPLETO APP.JS
+   APP STOCK MAGAZZINO CINEMA - FILE COMPLETO APP.JS (FIXED)
    ========================================================================== */
 
 let mag = [], size = [], rows = [], postMixProducts = [];
@@ -31,7 +31,7 @@ function getActiveCinemaCandyConfig() {
         { id: "block_0", name: "🍬 Espositore Principale", columns: 22, rows: 2, gridValues: {} },
         { id: "block_1", name: "📦 Scorte / Magazzino", columns: 10, rows: 2, gridValues: {} }
       ],
-      buste: Array(10).fill({kg: 0, sleeve: 0})
+      buste: Array(10).fill().map(() => ({kg: 0, sleeve: 0}))
     };
   }
   let cfg = candyGridConfigs[cinemaName];
@@ -44,7 +44,7 @@ function getActiveCinemaCandyConfig() {
       { id: "block_1", name: "📦 Scorte / Magazzino", columns: 10, rows: 2, gridValues: {} }
     ];
   }
-  if (!cfg.buste || !Array.isArray(cfg.buste)) cfg.buste = Array(10).fill({kg: 0, sleeve: 0});
+  if (!cfg.buste || !Array.isArray(cfg.buste)) cfg.buste = Array(10).fill().map(() => ({kg: 0, sleeve: 0}));
   return cfg;
 }
 function saveCandyConfig() {
@@ -171,7 +171,6 @@ document.addEventListener("DOMContentLoaded", () => {
   updateHeaderTitle();
   injectExcelTemplateButton();
 
-  // Rimozione di eventuali duplicati in basso
   const bottomExportBtns = document.querySelectorAll("button[onclick*='export'], .btn-export");
   bottomExportBtns.forEach(btn => btn.remove());
 
@@ -212,6 +211,147 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+/* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE, POST MIX, DISTRIBUTORI) --- */
+function renderCandyView() {
+  const container = $("tbody");
+  const thead = $("thead");
+  if (!container || !thead) return;
+
+  const cfg = getActiveCinemaCandyConfig();
+  thead.innerHTML = `<tr><th colspan="10" style="background:#d35400; color:white; font-size:1.1rem; padding:10px;">🍬 Gestione Inserimento Caramelle (${esc(cinemaName)})</th></tr>`;
+  
+  let html = `<tr><td colspan="10" style="padding:15px; background:#fff3e0;">`;
+  html += `<h4>Totale Netto Calcolato: <span style="color:#d35400;">${getCandyTotalKg().toFixed(2)} Kg</span></h4>`;
+  html += `<p style="font-size:0.85rem; color:#666;">Inserisci i pesi rilevati nelle vaschette/buste. Le tare verranno sottratte automaticamente.</p>`;
+
+  cfg.blocks.forEach((b, bIdx) => {
+    html += `<div style="margin-top:15px; background:white; padding:10px; border-radius:6px; border:1px solid #ffe0b2;">
+              <h5 style="color:#e67e22;">${esc(b.name)} (${b.rows}x${b.columns})</h5>
+              <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 10)}, 1fr); gap:5px; margin-top:8px; overflow-x:auto;">`;
+    for(let r=0; r<b.rows; r++) {
+      for(let c=0; c<b.columns; c++) {
+        let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
+        html += `<div style="border:1px solid #ccc; padding:4px; text-align:center; background:#fafafa; border-radius:4px;">
+                  <span style="font-size:0.75rem; color:#888;">R${r+1}-C${c+1}</span>
+                  <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.8rem; text-align:center;" 
+                    onchange="updateCandyCell(${bIdx}, ${r}, ${c}, this.value)">
+                </div>`;
+      }
+    }
+    html += `</div></div>`;
+  });
+
+  html += `</td></tr>`;
+  container.innerHTML = html;
+}
+
+function updateCandyCell(bIdx, r, c, val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
+  if (!cfg.blocks[bIdx].gridValues[r]) cfg.blocks[bIdx].gridValues[r] = {};
+  cfg.blocks[bIdx].gridValues[r][c] = { weight: val, taraIdx: 0 };
+  saveCandyConfig();
+  recalcKPIs();
+}
+
+function renderPostMixView() {
+  const container = $("tbody");
+  const thead = $("thead");
+  if (!container || !thead) return;
+
+  const cfg = getActiveCinemaPostMixConfig();
+  thead.innerHTML = `<tr><th colspan="10" style="background:#2980b9; color:white; font-size:1.1rem; padding:10px;">🥤 Post Mix e Sciroppi (${esc(cinemaName)})</th></tr>`;
+
+  let html = `<tr><td colspan="10" style="padding:15px; background:#eaf2f8;">`;
+  const totals = getPostMixProductTotals();
+  html += `<h4>Totali Rilevati Sciroppi:</h4><ul style="margin-bottom:15px; font-size:0.9rem;">`;
+  for(let [p, kg] of Object.entries(totals)) {
+    html += `<li><b>${esc(p)}:</b> ${kg.toFixed(2)} Kg netti</li>`;
+  }
+  html += `</ul>`;
+
+  cfg.blocks.forEach((b, bIdx) => {
+    html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1;">
+              <h5 style="color:#2980b9;">${esc(b.name)}</h5>
+              <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 6)}, 1fr); gap:6px; margin-top:8px; overflow-x:auto;">`;
+    for(let r=0; r<b.rows; r++) {
+      for(let c=0; c<b.columns; c++) {
+        let cell = b.gridValues?.[r]?.[c] || { prodName: "", weight: "" };
+        html += `<div style="border:1px solid #ccc; padding:4px; text-align:center; background:#fafafa; border-radius:4px;">
+                  <select style="width:100%; font-size:0.75rem; margin-bottom:2px;" onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, this.value, null)">
+                    <option value="">-- Prodotto --</option>
+                    ${postMixProducts.map(p => `<option value="${esc(p.name)}" ${cell.prodName === p.name ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+                  </select>
+                  <input type="number" step="any" placeholder="Kg Lordi" value="${cell.weight || ''}" style="width:100%; font-size:0.8rem; text-align:center;"
+                    onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, null, this.value)">
+                </div>`;
+      }
+    }
+    html += `</div></div>`;
+  });
+
+  html += `</td></tr>`;
+  container.innerHTML = html;
+}
+
+function updatePostMixCell(bIdx, r, c, prodName, weight) {
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
+  if (!cfg.blocks[bIdx].gridValues[r]) cfg.blocks[bIdx].gridValues[r] = {};
+  let current = cfg.blocks[bIdx].gridValues[r][c] || { prodName: "", weight: "" };
+  
+  if (prodName !== null) current.prodName = prodName;
+  if (weight !== null) current.weight = weight;
+  
+  cfg.blocks[bIdx].gridValues[r][c] = current;
+  savePostMixConfig();
+  recalcKPIs();
+}
+
+function renderDistributorsView() {
+  const container = $("tbody");
+  const thead = $("thead");
+  if (!container || !thead) return;
+
+  const cfg = getActiveCinemaDistributorConfig();
+  thead.innerHTML = `<tr><th colspan="10" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
+
+  let html = `<tr><td colspan="10" style="padding:15px; background:#f5eef8;">`;
+  cfg.distributors.forEach((d, dIdx) => {
+    html += `<div style="background:white; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #d2b4de;">
+              <h5 style="color:#8e44ad; margin-bottom:8px;">${esc(d.name)} — Fondo Resti: €${d.fondoResti}</h5>
+              <table style="width:100%; font-size:0.8rem; border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#ebdef0;">
+                    <th style="padding:4px;">Prodotto</th>
+                    <th style="padding:4px;">Stock Iniziale</th>
+                    <th style="padding:4px;">Conta Finale</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+    d.rows.forEach((r, rIdx) => {
+      html += `<tr>
+                <td><input type="text" value="${esc(r.product)}" placeholder="Nome Prodotto" style="width:100%; border:1px solid #ddd;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)"></td>
+                <td><input type="number" value="${r.stockIniziale}" style="width:100%; border:1px solid #ddd; text-align:center;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>
+                <td><input type="number" value="${r.contaFinale}" style="width:100%; border:1px solid #ddd; text-align:center; font-weight:bold;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
+              </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  html += `</td></tr>`;
+  container.innerHTML = html;
+}
+
+function updateDistRow(dIdx, rIdx, key, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
+    cfg.distributors[dIdx].rows[rIdx][key] = val;
+    saveDistributorConfig();
+    recalcKPIs();
+  }
+}
+
 /* --- BARRA PULSANTI UNIFICATA IN ALTO --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
@@ -222,7 +362,6 @@ function injectExcelTemplateButton() {
   btnContainer.className = "no-print";
   btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
 
-  // 1. Pulsante Blu
   const exportTemplateBtn = document.createElement("button");
   exportTemplateBtn.id = "btnExportExcelTemplate";
   exportTemplateBtn.className = "btn btn-secondary";
@@ -230,7 +369,6 @@ function injectExcelTemplateButton() {
   exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportTemplateBtn.onclick = () => handleDynamicExport(true);
 
-  // 2. Pulsante Verde Unico
   const exportCountsBtn = document.createElement("button");
   exportCountsBtn.id = "btnExportExcelCounts";
   exportCountsBtn.className = "btn btn-success";
@@ -249,7 +387,6 @@ function injectExcelTemplateButton() {
   }
 }
 
-/* --- GESTORE DINAMICO ESPORTAZIONE IN BASE AL TAB ATTIVO --- */
 function handleDynamicExport(isEmptyTemplate) {
   if (currentTab === 'candy') {
     exportCandyGridExcel(isEmptyTemplate);
@@ -266,7 +403,6 @@ function handleDynamicExport(isEmptyTemplate) {
   }
 }
 
-/* --- ESPORTAZIONE SPECIFICA CARAMELLE (GRIGLIE + BUSTE) --- */
 function exportCandyGridExcel(isEmpty) {
   const cfg = getActiveCinemaCandyConfig();
   let html = `
@@ -325,7 +461,6 @@ function exportCandyGridExcel(isEmpty) {
   downloadExcelBlob(html, `Caramelle_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
 
-/* --- ESPORTAZIONE SPECIFICA POST MIX --- */
 function exportPostMixGridExcel(isEmpty) {
   const cfg = getActiveCinemaPostMixConfig();
   let html = `
@@ -368,7 +503,6 @@ function exportPostMixGridExcel(isEmpty) {
   downloadExcelBlob(html, `PostMix_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
 
-/* --- ESPORTAZIONE SPECIFICA DISTRIBUTORI --- */
 function exportDistributorsExcel(isEmpty) {
   const cfg = getActiveCinemaDistributorConfig();
   let html = `
@@ -430,7 +564,6 @@ function downloadExcelBlob(htmlContent, fileName) {
   URL.revokeObjectURL(url);
 }
 
-/* --- ESPORTAZIONE INVENTARIO REALE COMPLETO CON CONTEGGI ( MAGAZZINO CLASSICO ) --- */
 function exportCurrentInventoryToExcel() {
   if (!rows || rows.length === 0) {
     alert("Nessun dato prodotto caricato da esportare!");
@@ -570,7 +703,6 @@ function exportCurrentInventoryToExcel() {
   downloadExcelBlob(html, `Report_Inventario_${activeMagName.replace(/[^a-zA-Z0-9-_]/g, "_")}.xls`);
 }
 
-/* --- ESPORTAZIONE TEMPLATE CONTEGGIO VUOTO IN EXCEL ( MAGAZZINO CLASSICO ) --- */
 function exportEmptyTemplateToExcel() {
   if (!rows || rows.length === 0) {
     alert("Nessun prodotto caricato!");
@@ -1060,9 +1192,9 @@ function getGlobalRilevato(code, r) {
 }
 function render() {
   if (currentTab === 'setup') return;
-  if (currentTab === 'candy') { if (typeof renderCandyView === 'function') renderCandyView(); return; }
-  if (currentTab === 'postmix') { if (typeof renderPostMixView === 'function') renderPostMixView(); return; }
-  if (currentTab === 'distributors') { if (typeof renderDistributorsView === 'function') renderDistributorsView(); return; }
+  if (currentTab === 'candy') { renderCandyView(); return; }
+  if (currentTab === 'postmix') { renderPostMixView(); return; }
+  if (currentTab === 'distributors') { renderDistributorsView(); return; }
   
   const q = $("search") ? norm($("search").value) : "";
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
