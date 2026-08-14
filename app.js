@@ -1984,60 +1984,59 @@ function render() {
   const tbody = $("tbody");
   if (!tbody) return;
   let html = "";
-  
   data.forEach((r) => {
-    let boxVal = 0, sleeveVal = 0, sfusoVal = 0;
-    if (!isTotTab && typeof currentTab === 'number') {
-      const c = getCount(currentTab, r.code);
-      boxVal = c.box[0] || 0;
-      sleeveVal = c.sleeve[0] || 0;
-      sfusoVal = c.sfuso[0] || 0;
-    } else if (isTotTab) {
-      warehouses.forEach((_, wIdx) => {
-        const cWh = getCount(wIdx, r.code);
-        boxVal += sumArr(cWh.box);
-        sleeveVal += sumArr(cWh.sleeve);
-        sfusoVal += sumArr(cWh.sfuso);
-      });
-    }
-    
-    let kitPart = getKitContributionDetail(r.name, r.code);
-    let effettivo = getGlobalRilevato(r.code, r);
-    let diff = effettivo - (r.atteso || 0);
-    let diffVal = diff * (r.standardCost || 0);
-    let baseRilevato = (boxVal * (r.boxSize || 0)) + (sleeveVal * (r.sleeveSize || 0)) + sfusoVal;
-    
-    html += `
-      <tr>
-        <td><b>${esc(r.name)}</b><br><small style="color:#666">${esc(r.code)}</small></td>
-        <td>${esc(r.uom)}</td>
-        <td>${fmt(r.iniziale)}</td>
-        <td>${fmt(r.danni)}</td>
-        <td>${fmt(r.venduto)}</td>
-        <td class="grp-box">${r.boxSize || '-'}</td>
-        <td class="grp-box">
-          ${isTotTab ? fmt(boxVal) : `<input type="number" value="${boxVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'box', 0, this.value)">`}
-        </td>
-        <td class="grp-sleeve">${r.sleeveSize || '-'}</td>
-        <td class="grp-sleeve">
-          ${isTotTab ? fmt(sleeveVal) : `<input type="number" value="${sleeveVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'sleeve', 0, this.value)">`}
-        </td>
-        <td class="grp-sfuso">
-          ${isTotTab ? fmt(sfusoVal) : `<input type="number" value="${sfusoVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'sfuso', 0, this.value)">`}
-        </td>
-        <td><b>${fmt(r.atteso)}</b></td>
-        <td>${fmt(baseRilevato)}</td>
-        <td>${fmt(kitPart)}</td>
-        <td><b>${fmt(effettivo)}</b></td>
-        <td style="color: ${diff < 0 ? 'red' : 'green'}"><b>${fmt(diff)}</b></td>
-        <td>€ ${fmtMoney(r.standardCost)}</td>
-        <td style="color: ${diffVal < 0 ? 'red' : 'green'}"><b>€ ${fmtMoney(diffVal)}</b></td>
-      </tr>
-    `;
-  });
-  tbody.innerHTML = html;
-  recalcKPIs();
-}
+  let boxVal = 0, sleeveVal = 0, sfusoVal = 0;
+  if (!isTotTab && typeof currentTab === 'number') {
+    const c = getCount(currentTab, r.code);
+    boxVal = c.box[0] || 0;
+    sleeveVal = c.sleeve[0] || 0;
+    sfusoVal = c.sfuso[0] || 0;
+  } else if (isTotTab) {
+    warehouses.forEach((_, widx) => {
+      const cwh = getCount(widx, r.code);
+      boxVal += sumArr(cwh.box);
+      sleeveVal += sumArr(cwh.sleeve);
+      sfusoVal += sumArr(cwh.sfuso);
+    });
+  }
+
+  let kitPart = getKitContributionDetail(r.name, r.code);
+  let baseRilevato = (boxVal * (r.boxSize || 0)) + (sleeveVal * (r.sleeveSize || 0)) + sfusoVal;
+  
+  let effettivo = getGlobalRilevato(r.code, r) + baseRilevato; 
+  let diff = effettivo - (r.atteso || 0);
+  let diffVal = diff * (r.standardCost || 0);
+
+  html += `
+    <tr>
+      <td><b>${esc(r.name)}</b><br><small style="color:#666">${esc(r.code)}</small></td>
+      <td>${esc(r.uom)}</td>
+      <td>${fmt(r.iniziale)}</td>
+      <td>${fmt(r.danni)}</td>
+      <td>${fmt(r.venduto)}</td>
+      <td class="grp-box">${r.boxSize || '-'}</td>
+      <td class="grp-box">
+        ${isTotTab ? fmt(boxVal) : `<input type="number" value="${boxVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'box', 0, this.value)">`}
+      </td>
+      <td class="grp-sleeve">${r.sleeveSize || '-'}</td>
+      <td class="grp-sleeve">
+        ${isTotTab ? fmt(sleeveVal) : `<input type="number" value="${sleeveVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'sleeve', 0, this.value)">`}
+      </td>
+      <td class="grp-sfuso">
+        ${isTotTab ? fmt(sfusoVal) : `<input type="number" value="${sfusoVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'sfuso', 0, this.value)">`}
+      </td>
+      <td><b>${fmt(r.atteso)}</b></td>
+      <td>${fmt(baseRilevato)}</td>
+      <td>${fmt(kitPart)}</td>
+      <td><b>${fmt(effettivo)}</b></td>
+      <td style="color: ${diff < 0 ? 'red' : 'green'}"><b>${fmt(diff)}</b></td>
+      <td>€ ${fmtMoney(r.standardCost)}</td>
+      <td style="color: ${diffVal < 0 ? 'red' : 'green'}"><b>€ ${fmtMoney(diffVal)}</b></td>
+    </tr>
+  `;
+});
+tbody.innerHTML = html;
+recalcKPIs();
 
 function updateCount(whIdx, code, type, fieldIdx, val) {
   const c = getCount(whIdx, code);
