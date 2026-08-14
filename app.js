@@ -1041,7 +1041,9 @@ function syncDistributorsToGlobalStock() {
     });
   });
 
-  // Aggiorna l'array 'rows'
+  let updated = false;
+
+  // Aggiorna l'array globale 'rows'
   if (typeof rows !== 'undefined' && Array.isArray(rows)) {
     rows.forEach(item => {
       const prodName = item.name || item.prodotto || item.product || item.Descrizione || item.Articolo;
@@ -1052,6 +1054,8 @@ function syncDistributorsToGlobalStock() {
           item.effettivo = val;
           item.effettivoTotale = val;
           item.effettivo_totale = val;
+          item.totaleEffettivo = val;
+          updated = true;
         }
       }
     });
@@ -1068,7 +1072,18 @@ function syncDistributorsToGlobalStock() {
           item.effettivo = val;
           item.effettivoTotale = val;
           item.effettivo_totale = val;
+          item.totaleEffettivo = val;
+          updated = true;
         }
+      }
+    });
+  }
+
+  // Cerca e attiva qualsiasi funzione di salvataggio globale esistente nell'app
+  if (updated) {
+    ['saveInventory', 'saveData', 'save', 'salvaDati', 'saveToLocalStorage', 'saveRows'].forEach(fnName => {
+      if (typeof window[fnName] === 'function') {
+        try { window[fnName](); } catch (e) {}
       }
     });
   }
@@ -1076,16 +1091,16 @@ function syncDistributorsToGlobalStock() {
   if (typeof updateGlobalStockFromDistributors === 'function') {
     try {
       updateGlobalStockFromDistributors(totalsByProduct, 'effettivoTotale');
-    } catch (e) {
-      console.warn("updateGlobalStockFromDistributors non riuscito:", e);
-    }
+    } catch (e) {}
   }
 
-  // Aggiorna visivamente le tabelle di magazzino se esistono
+  // Ridisegna la tabella principale
   if (typeof renderInventoryTable === 'function') {
     renderInventoryTable();
   } else if (typeof renderTable === 'function') {
     renderTable();
+  } else if (typeof render === 'function') {
+    render();
   }
 }
 
