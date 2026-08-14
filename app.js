@@ -911,16 +911,6 @@ function removeDistributorRow(dIdx, rIdx) {
     renderDistributorsView();
   }
 }
-
-function updateDistRow(dIdx, rIdx, key, val) {
-  const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
-    cfg.distributors[dIdx].rows[rIdx][key] = val;
-    saveDistributorConfig();
-    recalcKPIs();
-  }
-}
-
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
