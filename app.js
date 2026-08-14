@@ -501,7 +501,21 @@ function updatePostMixCell(bIdx, r, c, prodName, weight) {
   savePostMixConfig();
   recalcKPIs();
 }
+function updateCandyOrientation(val) {
+  const cfg = getActiveCinemaCandyConfig();
+  if (!cfg) return;
+  cfg.orientation = val;
+  if (typeof saveCandyConfig === "function") saveCandyConfig();
+  renderCandyView();
+}
 
+function updatePostMixOrientation(val) {
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg) return;
+  cfg.orientation = val;
+  savePostMixConfig();
+  renderPostMixView();
+}
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
