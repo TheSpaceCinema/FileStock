@@ -683,49 +683,86 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 
-// Helper per recuperare TUTTI i prodotti senza filtri e senza fallback limitanti
 function getAvailableProductsList() {
-  let productsSet = new Set();
+  // Inizializza o recupera la cache globale per non perdere mai i prodotti caricati
+  if (!window._cachedAllProducts) {
+    window._cachedAllProducts = new Set([
+      "3D Glasses component", "Acqua frizzante 50 cl", "Acqua frizzante 75 cl", 
+      "Acqua Naturale", "Acqua naturale 50 cl", "Acqua Naturale 75 cl", 
+      "Arachidi", "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "Twix", "Mars", "Snickers"
+    ]);
+  }
 
-  // 1. Estrae i prodotti direttamente dalle celle della tabella del magazzino già renderizzata a schermo
-  const tableRows = document.querySelectorAll('tr');
-  tableRows.forEach(row => {
-    const firstCell = row.querySelector('td, th');
-    if (firstCell) {
-      const text = firstCell.textContent.trim();
-      // Esclude le intestazioni della tabella o etichette di sistema
-      if (text && text !== "Prodotto" && text !== "U.M." && text.length > 1) {
-        productsSet.add(text);
-      }
-    }
-  });
+  // 1. Scansiona tutte le possibili variabili globali di inventario/magazzino in memoria
+  const globalSources = [
+    window.inventoryData,
+    window.masterInventory,
+    window.allProducts,
+    window.loadedData,
+    window.historicalData,
+    window.excelData,
+    window.dbData
+  ];
 
-  // 2. Cerca anche nelle variabili globali standard per sicurezza
-  const globalSources = [window.inventoryData, window.masterInventory, window.allProducts, window.loadedData];
   globalSources.forEach(source => {
     if (Array.isArray(source)) {
       source.forEach(item => {
         if (!item) return;
-        const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name || item.Nome);
-        if (name && typeof name === 'string' && name.trim() !== '') {
-          productsSet.add(name.trim());
+        const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name || item.Nome || item.descrizione);
+        if (name && typeof name === 'string' && name.trim() !== '' && !name.includes('🍫') && !name.toLowerCase().includes('distributori')) {
+          window._cachedAllProducts.add(name.trim());
         }
       });
     }
   });
 
-  // Se trova la lista completa dei prodotti a schermo, la restituisce ordinata alfabeticamente
-  if (productsSet.size > 15) {
-    return Array.from(productsSet).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
+  // 2. Controlla strutture a magazzini multipli (es. warehouses)
+  if (typeof warehouses !== 'undefined' && warehouses) {
+    const wList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses);
+    wList.forEach(w => {
+      const items = w.items || w.inventory || w.products || w || (Array.isArray(w) ? w : null);
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          const name = typeof item === 'string' ? item : (item && (item.prodotto || item.product || item.name || item.Nome));
+          if (name && typeof name === 'string' && name.trim() !== '') {
+            window._cachedAllProducts.add(name.trim());
+          }
+        });
+      }
+    });
   }
 
-  // 3. Fallback di sicurezza nel caso in cui la pagina si stia caricando
-  return [
-    "3D Glasses component", "Acqua frizzante 50 cl", "Acqua frizzante 75 cl", 
-    "Acqua Naturale", "Acqua naturale 50 cl", "Acqua Naturale 75 cl", 
-    "Arachidi", "B&J Caramel chechchew", "B&J Choc Fudge Brownie", "Bounty", 
-    "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers"
-  ];
+  // 3. Scansiona dinamicamente qualsiasi oggetto globale in memoria
+  for (let key in window) {
+    try {
+      const val = window[key];
+      if (Array.isArray(val) && val.length > 0) {
+        val.forEach(item => {
+          if (item && typeof item === 'object') {
+            const name = item.prodotto || item.product || item.name || item.Nome || item.descrizione;
+            if (name && typeof name === 'string' && name.trim() !== '' && !name.includes('🍫') && !name.toLowerCase().includes('distributori')) {
+              window._cachedAllProducts.add(name.trim());
+            }
+          }
+        });
+      }
+    } catch (e) {}
+  }
+
+  // 4. Aggiunge anche i prodotti già selezionati nei distributori correnti per sicurezza
+  const cfg = typeof getActiveCinemaDistributorConfig === 'function' ? getActiveCinemaDistributorConfig() : null;
+  if (cfg && cfg.distributors) {
+    cfg.distributors.forEach(d => {
+      (d.rows || []).forEach(r => {
+        if (r.product && r.product.trim() !== '') {
+          window._cachedAllProducts.add(r.product.trim());
+        }
+      });
+    });
+  }
+
+  // Restituisce l'elenco completo unificato, pulito e ordinato alfabeticamente
+  return Array.from(window._cachedAllProducts).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
 }
 /* --- RENDER DISTRIBUTORI AUTOMATICI --- */
 function renderDistributorsView() {
