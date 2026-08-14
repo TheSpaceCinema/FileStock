@@ -687,22 +687,25 @@ function updatePostMixBlockCols(bIdx, val) {
 function getAvailableProductsList() {
   let productsSet = new Set();
 
-  // 1. Cerca in tutte le possibili variabili globali di inventario/magazzino
-  const globalSources = [
-    window.inventoryData,
-    window.masterInventory,
-    window.allProducts,
-    window.loadedData,
-    window.historicalData,
-    window.excelData,
-    window.dbData
-  ];
+  // 1. Estrae i prodotti direttamente dalle celle della tabella del magazzino già renderizzata a schermo
+  const tableRows = document.querySelectorAll('tr');
+  tableRows.forEach(row => {
+    const firstCell = row.querySelector('td, th');
+    if (firstCell) {
+      const text = firstCell.textContent.trim();
+      // Esclude le intestazioni della tabella o etichette di sistema
+      if (text && text !== "Prodotto" && text !== "U.M." && text.length > 1) {
+        productsSet.add(text);
+      }
+    }
+  });
 
+  // 2. Cerca anche nelle variabili globali standard per sicurezza
+  const globalSources = [window.inventoryData, window.masterInventory, window.allProducts, window.loadedData];
   globalSources.forEach(source => {
     if (Array.isArray(source)) {
       source.forEach(item => {
         if (!item) return;
-        // Recupera il nome del prodotto indipendentemente dalla proprietà usata nell'oggetto
         const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name || item.Nome);
         if (name && typeof name === 'string' && name.trim() !== '') {
           productsSet.add(name.trim());
@@ -711,28 +714,12 @@ function getAvailableProductsList() {
     }
   });
 
-  // 2. Se l'app usa una struttura a magazzini multipli (es. warehouses o magazzini numerati)
-  if (typeof warehouses !== 'undefined' && warehouses) {
-    const wList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses);
-    wList.forEach(w => {
-      const items = w.items || w.inventory || w.products || w;
-      if (Array.isArray(items)) {
-        items.forEach(item => {
-          const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name || item.Nome);
-          if (name && typeof name === 'string' && name.trim() !== '') {
-            productsSet.add(name.trim());
-          }
-        });
-      }
-    });
-  }
-
-  // Se abbiamo trovato i prodotti, restituisci l'array completo ordinato alfabeticamente
-  if (productsSet.size > 0) {
+  // Se trova la lista completa dei prodotti a schermo, la restituisce ordinata alfabeticamente
+  if (productsSet.size > 15) {
     return Array.from(productsSet).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
   }
 
-  // 3. Fallback estremo basato sui dati reali visibili nel tuo magazzino (estratto dalla seconda foto)
+  // 3. Fallback di sicurezza nel caso in cui la pagina si stia caricando
   return [
     "3D Glasses component", "Acqua frizzante 50 cl", "Acqua frizzante 75 cl", 
     "Acqua Naturale", "Acqua naturale 50 cl", "Acqua Naturale 75 cl", 
@@ -740,7 +727,6 @@ function getAvailableProductsList() {
     "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers"
   ];
 }
-
 /* --- RENDER DISTRIBUTORI AUTOMATICI --- */
 function renderDistributorsView() {
   const container = $("tbody");
