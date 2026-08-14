@@ -470,7 +470,7 @@ html += `<div style="margin-top:8px;">`;
     }
 
     // 4. Chiudiamo i div contenitori
-    html += `</div></div>`;
+    html += '</div></div></div>';
   });
 
   html += `</td></tr>`;
