@@ -2037,7 +2037,7 @@ function render() {
 });
 tbody.innerHTML = html;
 recalcKPIs();
-
+}
 function updateCount(whIdx, code, type, fieldIdx, val) {
   const c = getCount(whIdx, code);
   c[type][fieldIdx] = n(val);
