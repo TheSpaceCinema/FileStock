@@ -683,14 +683,9 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 function getAvailableProductsList() {
-  if (!window._cachedAllProducts) {
-    window._cachedAllProducts = new Set([
-      "3D Glasses component", "Acqua frizzante 50 cl", "Acqua frizzante 75 cl", 
-      "Acqua Naturale", "Acqua naturale 50 cl", "Acqua Naturale 75 cl", 
-      "Arachidi", "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "Twix", "Mars", "Snickers"
-    ]);
-  }
+  let productsSet = new Set();
 
+  // Helper per estrarre il nome gestendo qualsiasi maiuscola/minuscola da Excel
   const extractName = (item) => {
     if (!item) return null;
     if (typeof item === 'string') return item;
@@ -701,6 +696,7 @@ function getAvailableProductsList() {
            item.descrizione || item.Descrizione || item.DESCRIZIONE;
   };
 
+  // 1. Scansiona tutte le possibili variabili globali di inventario/magazzino
   const globalSources = [
     window.inventoryData,
     window.masterInventory,
@@ -716,12 +712,13 @@ function getAvailableProductsList() {
       source.forEach(item => {
         const name = extractName(item);
         if (name && typeof name === 'string' && name.trim() !== '' && !name.includes('🍫') && !name.toLowerCase().includes('distributori')) {
-          window._cachedAllProducts.add(name.trim());
+          productsSet.add(name.trim());
         }
       });
     }
   });
 
+  // 2. Controlla strutture a magazzini multipli (es. warehouses)
   if (typeof warehouses !== 'undefined' && warehouses) {
     const wList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses);
     wList.forEach(w => {
@@ -730,13 +727,14 @@ function getAvailableProductsList() {
         items.forEach(item => {
           const name = extractName(item);
           if (name && typeof name === 'string' && name.trim() !== '') {
-            window._cachedAllProducts.add(name.trim());
+            productsSet.add(name.trim());
           }
         });
       }
     });
   }
 
+  // 3. Scansiona dinamicamente qualsiasi oggetto globale in memoria
   for (let key in window) {
     try {
       const val = window[key];
@@ -745,7 +743,7 @@ function getAvailableProductsList() {
           if (item && typeof item === 'object') {
             const name = extractName(item);
             if (name && typeof name === 'string' && name.trim() !== '' && !name.includes('🍫') && !name.toLowerCase().includes('distributori')) {
-              window._cachedAllProducts.add(name.trim());
+              productsSet.add(name.trim());
             }
           }
         });
@@ -753,18 +751,25 @@ function getAvailableProductsList() {
     } catch (e) {}
   }
 
+  // 4. Aggiunge anche i prodotti già selezionati nei distributori correnti
   const cfg = typeof getActiveCinemaDistributorConfig === 'function' ? getActiveCinemaDistributorConfig() : null;
   if (cfg && cfg.distributors) {
     cfg.distributors.forEach(d => {
       (d.rows || []).forEach(r => {
         if (r.product && r.product.trim() !== '') {
-          window._cachedAllProducts.add(r.product.trim());
+          productsSet.add(r.product.trim());
         }
       });
     });
   }
 
-  return Array.from(window._cachedAllProducts).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
+  // Se non ha trovato nulla, usa un piccolo fallback di sicurezza
+  if (productsSet.size === 0) {
+    return ["3D Glasses component", "Acqua frizzante 50 cl", "Bounty", "Mars", "Twix", "Snickers"];
+  }
+
+  // Restituisce l'elenco completo, pulito e ordinato alfabeticamente
+  return Array.from(productsSet).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
 }
 /* --- RENDER DISTRIBUTORI AUTOMATICI --- */
 function renderDistributorsView() {
