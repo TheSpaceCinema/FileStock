@@ -1156,21 +1156,6 @@ function injectExcelTemplateButton() {
   }
 }
 
-function handleDynamicExport(isEmptyTemplate) {
-  if (currentTab === 'candy') {
-    exportCandyGridExcel(isEmptyTemplate);
-  } else if (currentTab === 'postmix') {
-    exportPostMixGridExcel(isEmptyTemplate);
-  } else if (currentTab === 'distributors') {
-    exportDistributorsExcel(isEmptyTemplate);
-  } else {
-    if (isEmptyTemplate) {
-      exportEmptyTemplateToExcel();
-    } else {
-      exportCurrentInventoryToExcel();
-    }
-  }
-}
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 
 function injectExcelTemplateButton() {
@@ -1248,22 +1233,6 @@ function injectExcelTemplateButton() {
     titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
   } else {
     document.body.insertBefore(btnContainer, document.body.firstChild);
-  }
-}
-
-function handleDynamicExport(isEmptyTemplate) {
-  if (currentTab === 'candy') {
-    exportCandyGridExcel(isEmptyTemplate);
-  } else if (currentTab === 'postmix') {
-    exportPostMixGridExcel(isEmptyTemplate);
-  } else if (currentTab === 'distributors') {
-    exportDistributorsExcel(isEmptyTemplate);
-  } else {
-    if (isEmptyTemplate) {
-      exportEmptyTemplateToExcel();
-    } else {
-      exportCurrentInventoryToExcel();
-    }
   }
 }
 
