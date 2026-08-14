@@ -670,7 +670,7 @@ function updatePostMixBlockCols(bIdx, val) {
 function getAvailableProductsList() {
   let productsSet = new Set();
   
-  // 1. Aggiungi il controllo sull'array principale dei prodotti caricati (rows)
+  // Aggiungi questo blocco per leggere i dati dall'array rows
   if (typeof rows !== 'undefined' && Array.isArray(rows)) {
     rows.forEach(r => {
       const name = r.name || r.prodotto || r.product;
@@ -678,7 +678,6 @@ function getAvailableProductsList() {
     });
   }
 
-  // 2. Controlli preesistenti per compatibilità
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const name = item.prodotto || item.product || item.name;
@@ -705,12 +704,6 @@ function getAvailableProductsList() {
     "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
   ];
 }
-```[cite: 2]
-
-### Verifica dei passaggi:
-1. Assicurati di aver caricato correttamente sia il file del **Magazzino** sia il file **Size** affinché l'array `rows` venga popolato dalla funzione `build()`[cite: 2].
-2. Una volta inserita la modifica, ricarica la pagina e apri la sezione **Distributori**[cite: 2]: i menù a tendina della colonna "PRODOTTO" elencheranno automaticamente tutti gli articoli presenti nel magazzino del cinema in ordine alfabetico[cite: 2].
-
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
