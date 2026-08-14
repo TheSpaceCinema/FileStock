@@ -1925,16 +1925,20 @@ function getGlobalRilevato(code, r) {
     }
   }
   const distTotals = getDistributorsContaFinaleTotals();
-  if (distTotals[rNameClean]) {
-    basePezzi += distTotals[rNameClean];
-  } else {
-    for (let [dName, dVal] of Object.entries(distTotals)) {
-      if (rNameClean.includes(dName) || dName.includes(rNameClean)) {
-        basePezzi += dVal;
-        break;
-      }
-    }
+
+for (let [dName, dVal] of Object.entries(distTotals)) {
+
+  const dNameClean = cleanStr(dName);
+
+  if (
+      dNameClean === rNameClean ||
+      dNameClean.includes(rNameClean) ||
+      rNameClean.includes(dNameClean)
+  ) {
+      basePezzi += dVal;
+      break;
   }
+}
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
 
