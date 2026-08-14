@@ -434,10 +434,10 @@ function renderPostMixView() {
   }
   html += `</ul>`;
 
-  cfg.blocks.forEach((b, bIdx) => {
-    html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1;">
-              <h5 style="color:#2980b9;">${esc(b.name)}</h5>
-html += `<div style="margin-top:8px;">`;
+ cfg.blocks.forEach((b, bIdx) => {
+  html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1;">`;
+  html += `<h5 style="color:#2980b9;">${esc(b.name)}</h5>`;
+  html += `<div style="margin-top:8px;">`;
 // 1. Definiamo lo stile del contenitore in base all'orientamento scelto
     let gridStyle = '';
     if (cfg.orientation === 'horizontal') {
