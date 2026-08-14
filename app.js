@@ -683,15 +683,28 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 
-// Helper per recuperare i prodotti disponibili dal file/magazzino
+// Helper per recuperare tutti i prodotti disponibili dai magazzini o file storici
 function getAvailableProductsList() {
   if (typeof getAllProducts === 'function') {
-    return getAllProducts();
+    const res = getAllProducts();
+    if (Array.isArray(res) && res.length > 0) return res;
   }
-  if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
+  if (window.globalProductsList && Array.isArray(window.globalProductsList) && window.globalProductsList.length > 0) {
     return window.globalProductsList;
   }
-  return ["Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers"];
+  if (window.allProducts && Array.isArray(window.allProducts) && window.allProducts.length > 0) {
+    return window.allProducts;
+  }
+  if (window.inventory && Array.isArray(window.inventory)) {
+    const invProducts = window.inventory.map(item => item.product || item.name).filter(Boolean);
+    if (invProducts.length > 0) return [...new Set(invProducts)];
+  }
+  // Lista completa di fallback con tutti i prodotti storici
+  return [
+    "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", 
+    "Twix", "Mars", "Snickers", "Kinder Bueno", "Kinder Barrette", 
+    "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
+  ];
 }
 
 /* --- RENDER DISTRIBUTORI AUTOMATICI --- */
@@ -703,7 +716,6 @@ function renderDistributorsView() {
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg.distributors) cfg.distributors = [];
   if (!cfg.orientation) cfg.orientation = 'horizontal';
-  if (!cfg.syncTarget) cfg.syncTarget = 'kit';
 
   // Calcola il numero massimo di colonne INS dinamiche (minimo 5)
   let maxInsCount = 5;
@@ -721,12 +733,12 @@ function renderDistributorsView() {
 
   let html = `<tr><td colspan="25" style="padding:15px; background:#f5eef8;">`;
 
-  // --- PANNELLO SUPERIORE (Controlli & Opzioni) ---
+  // --- PANNELLO SUPERIORE (Controlli & Opzioni - Senza menu ridondanti) ---
   html += `
     <div style="background:white; padding:15px; border-radius:8px; border:1px solid #d2b4de; margin-bottom:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
         
-        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
           <div>
             <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">N° Distributori:</label>
             <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorsCount(this.value)">
@@ -739,14 +751,6 @@ function renderDistributorsView() {
             <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorOrientation(this.value)">
               <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>↔️ Orizzontale (Affiancati)</option>
               <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>↕️ Verticale (In Colonna)</option>
-            </select>
-          </div>
-
-          <div>
-            <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">Somma "Conta Finale" su:</label>
-            <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; font-weight:bold; color:#8e44ad;" onchange="updateDistributorSyncTarget(this.value)">
-              <option value="kit" ${cfg.syncTarget === 'kit' ? 'selected' : ''}>➕ Da Kit/Spec.</option>
-              <option value="effettivo" ${cfg.syncTarget === 'effettivo' ? 'selected' : ''}>📊 Effettivo Totale/Diff.</option>
             </select>
           </div>
         </div>
@@ -846,7 +850,7 @@ function renderDistributorsView() {
 
       html += `
         <tr>
-          <!-- Menu a tendina Prodotto -->
+          <!-- Menu a tendina Prodotto (con tutti i prodotti disponibili) -->
           <td style="padding:2px; text-align:left;">
             <select style="width:100%; font-size:0.75rem; border:none; background:transparent;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
               <option value="">-- Seleziona --</option>
@@ -951,6 +955,7 @@ function updateDistRowIns(dIdx, rIdx, insIdx, val) {
     if (!row.insertions) row.insertions = [];
     row.insertions[insIdx] = val !== "" ? parseFloat(val) || 0 : "";
     saveDistributorConfig();
+    syncDistributorsToGlobalStock();
     recalcKPIs();
     renderDistributorsView();
   }
@@ -960,15 +965,6 @@ function updateDistributorOrientation(val) {
   const cfg = getActiveCinemaDistributorConfig();
   cfg.orientation = val;
   saveDistributorConfig();
-  renderDistributorsView();
-}
-
-function updateDistributorSyncTarget(val) {
-  const cfg = getActiveCinemaDistributorConfig();
-  cfg.syncTarget = val;
-  saveDistributorConfig();
-  syncDistributorsToGlobalStock();
-  recalcKPIs();
   renderDistributorsView();
 }
 
@@ -1042,6 +1038,7 @@ function removeDistributorRow(dIdx, rIdx) {
   }
 }
 
+// Sincronizzazione automatica della Conta Finale sui magazzini globali senza bisogno di configurazione manuale
 function syncDistributorsToGlobalStock() {
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg || !cfg.distributors) return;
@@ -1056,12 +1053,19 @@ function syncDistributorsToGlobalStock() {
     });
   });
 
+  // Chiamata automatica alle funzioni globali di aggiornamento magazzino (Kit e Totale Effettivo)
   if (typeof updateGlobalStockFromDistributors === 'function') {
-    updateGlobalStockFromDistributors(totalsByProduct, cfg.syncTarget);
+    updateGlobalStockFromDistributors(totalsByProduct, 'kit');
+    updateGlobalStockFromDistributors(totalsByProduct, 'effettivo');
+  }
+  
+  if (typeof updateInventoryFromDistributors === 'function') {
+    updateInventoryFromDistributors(totalsByProduct);
   }
 }
 
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
+
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
   if ($("exportTemplateBtnContainer")) return;
@@ -1069,20 +1073,24 @@ function injectExcelTemplateButton() {
   btnContainer.id = "exportTemplateBtnContainer";
   btnContainer.className = "no-print";
   btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
+  
   const exportTemplateBtn = document.createElement("button");
   exportTemplateBtn.id = "btnExportExcelTemplate";
   exportTemplateBtn.className = "btn btn-secondary";
   exportTemplateBtn.innerHTML = "📋 Esporta Excel (Template Vuoto)";
   exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportTemplateBtn.onclick = () => handleDynamicExport(true);
+  
   const exportCountsBtn = document.createElement("button");
   exportCountsBtn.id = "btnExportExcelCounts";
   exportCountsBtn.className = "btn btn-success";
   exportCountsBtn.innerHTML = "📊 Esporta Report (Conteggi Rilevati)";
   exportCountsBtn.style.cssText = "background: #27ae60; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportCountsBtn.onclick = () => handleDynamicExport(false);
+  
   btnContainer.appendChild(exportTemplateBtn);
   btnContainer.appendChild(exportCountsBtn);
+  
   const titleEl = $("appTitle") || headerContainer;
   if (titleEl && titleEl.parentNode) {
     titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
@@ -1093,16 +1101,16 @@ function injectExcelTemplateButton() {
 
 function handleDynamicExport(isEmptyTemplate) {
   if (currentTab === 'candy') {
-    exportCandyGridExcel(isEmptyTemplate);
+    if (typeof exportCandyGridExcel === 'function') exportCandyGridExcel(isEmptyTemplate);
   } else if (currentTab === 'postmix') {
-    exportPostMixGridExcel(isEmptyTemplate);
+    if (typeof exportPostMixGridExcel === 'function') exportPostMixGridExcel(isEmptyTemplate);
   } else if (currentTab === 'distributors') {
-    exportDistributorsExcel(isEmptyTemplate);
+    if (typeof exportDistributorsExcel === 'function') exportDistributorsExcel(isEmptyTemplate);
   } else {
     if (isEmptyTemplate) {
-      exportEmptyTemplateToExcel();
+      if (typeof exportEmptyTemplateToExcel === 'function') exportEmptyTemplateToExcel();
     } else {
-      exportCurrentInventoryToExcel();
+      if (typeof exportCurrentInventoryToExcel === 'function') exportCurrentInventoryToExcel();
     }
   }
 }
