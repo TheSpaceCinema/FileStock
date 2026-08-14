@@ -1156,41 +1156,6 @@ function injectExcelTemplateButton() {
   }
 }
 
-/* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
-
-function injectExcelTemplateButton() {
-  const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
-  if ($("exportTemplateBtnContainer")) return;
-  const btnContainer = document.createElement("div");
-  btnContainer.id = "exportTemplateBtnContainer";
-  btnContainer.className = "no-print";
-  btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
-  
-  const exportTemplateBtn = document.createElement("button");
-  exportTemplateBtn.id = "btnExportExcelTemplate";
-  exportTemplateBtn.className = "btn btn-secondary";
-  exportTemplateBtn.innerHTML = "📋 Esporta Excel (Template Vuoto)";
-  exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
-  exportTemplateBtn.onclick = () => handleDynamicExport(true);
-  
-  const exportCountsBtn = document.createElement("button");
-  exportCountsBtn.id = "btnExportExcelCounts";
-  exportCountsBtn.className = "btn btn-success";
-  exportCountsBtn.innerHTML = "📊 Esporta Report (Conteggi Rilevati)";
-  exportCountsBtn.style.cssText = "background: #27ae60; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
-  exportCountsBtn.onclick = () => handleDynamicExport(false);
-  
-  btnContainer.appendChild(exportTemplateBtn);
-  btnContainer.appendChild(exportCountsBtn);
-  
-  const titleEl = $("appTitle") || headerContainer;
-  if (titleEl && titleEl.parentNode) {
-    titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
-  } else {
-    document.body.insertBefore(btnContainer, document.body.firstChild);
-  }
-}
-
 function handleDynamicExport(isEmptyTemplate) {
   if (currentTab === 'candy') {
     if (typeof exportCandyGridExcel === 'function') exportCandyGridExcel(isEmptyTemplate);
@@ -1207,34 +1172,6 @@ function handleDynamicExport(isEmptyTemplate) {
   }
 }
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
-function injectExcelTemplateButton() {
-  const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
-  if ($("exportTemplateBtnContainer")) return;
-  const btnContainer = document.createElement("div");
-  btnContainer.id = "exportTemplateBtnContainer";
-  btnContainer.className = "no-print";
-  btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
-  const exportTemplateBtn = document.createElement("button");
-  exportTemplateBtn.id = "btnExportExcelTemplate";
-  exportTemplateBtn.className = "btn btn-secondary";
-  exportTemplateBtn.innerHTML = "📋 Esporta Excel (Template Vuoto)";
-  exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
-  exportTemplateBtn.onclick = () => handleDynamicExport(true);
-  const exportCountsBtn = document.createElement("button");
-  exportCountsBtn.id = "btnExportExcelCounts";
-  exportCountsBtn.className = "btn btn-success";
-  exportCountsBtn.innerHTML = "📊 Esporta Report (Conteggi Rilevati)";
-  exportCountsBtn.style.cssText = "background: #27ae60; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
-  exportCountsBtn.onclick = () => handleDynamicExport(false);
-  btnContainer.appendChild(exportTemplateBtn);
-  btnContainer.appendChild(exportCountsBtn);
-  const titleEl = $("appTitle") || headerContainer;
-  if (titleEl && titleEl.parentNode) {
-    titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
-  } else {
-    document.body.insertBefore(btnContainer, document.body.firstChild);
-  }
-}
 
 function exportCandyGridExcel(isEmpty) {
   const cfg = getActiveCinemaCandyConfig();
