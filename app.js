@@ -1079,20 +1079,25 @@ function syncDistributorsToGlobalStock() {
     (d.rows || []).forEach(r => {
       if (r.product && r.contaFinale !== "" && r.contaFinale !== null) {
         const val = parseFloat(r.contaFinale) || 0;
-        totalsByProduct[r.product] = (totalsByProduct[r.product] || 0) + val;
+        // Normalizzazione della chiave per evitare problemi di spazi o maiuscole/minuscole
+        const key = r.product.trim().toLowerCase();
+        totalsByProduct[key] = (totalsByProduct[key] || 0) + val;
       }
     });
   });
 
-  // Aggiornamento diretto delle strutture globali e chiamata della funzione nativa se presente
+  // Aggiornamento diretto delle strutture globali con confronto flessibile
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const prodName = item.prodotto || item.product || item.name;
-      if (prodName && totalsByProduct[prodName] !== undefined) {
-        if (cfg.syncTarget === 'kit') {
-          item.kit = totalsByProduct[prodName];
-        } else {
-          item.effettivo = totalsByProduct[prodName];
+      if (prodName) {
+        const itemKey = prodName.trim().toLowerCase();
+        if (totalsByProduct[itemKey] !== undefined) {
+          if (cfg.syncTarget === 'kit') {
+            item.kit = totalsByProduct[itemKey];
+          } else {
+            item.effettivo = totalsByProduct[itemKey];
+          }
         }
       }
     });
@@ -1100,6 +1105,13 @@ function syncDistributorsToGlobalStock() {
 
   if (typeof updateGlobalStockFromDistributors === 'function') {
     updateGlobalStockFromDistributors(totalsByProduct, cfg.syncTarget);
+  }
+
+  // Forza il re-render immediato della tabella di riepilogo a schermo
+  if (typeof renderInventoryTable === 'function') {
+    renderInventoryTable();
+  } else if (typeof renderTable === 'function') {
+    renderTable();
   }
 }
 
