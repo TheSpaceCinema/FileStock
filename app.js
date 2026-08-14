@@ -687,279 +687,49 @@ function updatePostMixBlockCols(bIdx, val) {
 function getAvailableProductsList() {
   let productsSet = new Set();
   
-  // 1. Estrae dinamicamente dall'inventario principale caricato (tutti i prodotti del magazzino)
+  console.log("--- DEBUG PRODOTTI ---");
+  console.log("InventoryData presente:", Array.isArray(window.inventoryData));
+  
+  // 1. Estrae dinamicamente dall'inventario principale
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
-    window.inventoryData.forEach(item => {
-      const name = item.prodotto || item.product || item.name;
-      if (name) productsSet.add(name.trim());
+    window.inventoryData.forEach((item, index) => {
+      // QUI AGGIUNGIAMO TUTTE LE POSSIBILI VARIANTI CHE IL TUO EXCEL POTREBBE AVERE
+      const name = item.prodotto || item.product || item.name || item.Descrizione || item.Articolo || item.Nome; 
+      
+      if (name) {
+        productsSet.add(name.trim());
+      } else if (index < 5) {
+        console.log("Oggetto inventario senza nome trovato:", item);
+      }
     });
   }
 
-  // 2. Recupera da eventuali funzioni o liste globali definite altrove nel file
+  // 2. Recupera da eventuali funzioni o liste globali
   if (typeof getAllProducts === 'function') {
     const prods = getAllProducts();
     if (Array.isArray(prods)) {
       prods.forEach(p => { if (p) productsSet.add(p.trim()); });
     }
   }
+  
   if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
     window.globalProductsList.forEach(p => { if (p) productsSet.add(p.trim()); });
   }
 
-  // Se troviamo prodotti, restituisce l'elenco completo ordinato alfabeticamente
+  console.log("Prodotti trovati nel Set:", productsSet.size);
+
+  // Se troviamo prodotti, restituisce l'elenco completo ordinato
   if (productsSet.size > 0) {
     return Array.from(productsSet).sort();
   }
 
-  // 3. Fallback di sicurezza se l'inventario non è ancora inizializzato
+  // 3. Fallback di sicurezza (solo se tutto fallisce)
+  console.warn("ATTENZIONE: Nessun prodotto trovato, uso fallback!");
   return [
     "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers", 
     "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
   ];
 }
-
-/* --- RENDER DISTRIBUTORI AUTOMATICI --- */
-function renderDistributorsView() {
-  const container = $("tbody");
-  const thead = $("thead");
-  if (!container || !thead) return;
-
-  const cfg = getActiveCinemaDistributorConfig();
-  if (!cfg.distributors) cfg.distributors = [];
-  if (!cfg.orientation) cfg.orientation = 'horizontal';
-  if (!cfg.syncTarget) cfg.syncTarget = 'kit';
-
-  // Sincronizza subito in background per sicurezza
-  syncDistributorsToGlobalStock();
-
-  // Calcola il numero massimo di colonne INS dinamiche (minimo 5)
-  let maxInsCount = 5;
-  cfg.distributors.forEach(d => {
-    (d.rows || []).forEach(r => {
-      const insArray = r.insertions || [];
-      const filledIns = insArray.filter(v => v !== "" && v !== null && !isNaN(v)).length;
-      if (filledIns >= maxInsCount) {
-        maxInsCount = filledIns + 1;
-      }
-    });
-  });
-
-  thead.innerHTML = `<tr><th colspan="25" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
-
-  let html = `<tr><td colspan="25" style="padding:15px; background:#f5eef8;">`;
-
-  // --- PANNELLO SUPERIORE (Controlli & Opzioni) ---
-  html += `
-    <div style="background:white; padding:15px; border-radius:8px; border:1px solid #d2b4de; margin-bottom:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
-        
-        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
-          <div>
-            <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">N° Distributori:</label>
-            <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorsCount(this.value)">
-              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${cfg.distributors.length === n ? 'selected' : ''}>${n} Distributori</option>`).join('')}
-            </select>
-          </div>
-
-          <div>
-            <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">Disposizione Layout:</label>
-            <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorOrientation(this.value)">
-              <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>↔️ Orizzontale (Affiancati)</option>
-              <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>↕️ Verticale (In Colonna)</option>
-            </select>
-          </div>
-
-          <div>
-            <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">Somma "Conta Finale" su:</label>
-            <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; font-weight:bold; color:#8e44ad;" onchange="updateDistributorSyncTarget(this.value)">
-              <option value="kit" ${cfg.syncTarget === 'kit' ? 'selected' : ''}>➕ Da Kit/Spec.</option>
-              <option value="effettivo" ${cfg.syncTarget === 'effettivo' ? 'selected' : ''}>📊 Effettivo Totale/Diff.</option>
-            </select>
-          </div>
-        </div>
-
-        <button style="background:#27ae60; color:white; border:none; padding:8px 15px; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="renderDistributorsView()">
-          🔄 Aggiorna / Rinfresca
-        </button>
-      </div>
-    </div>
-  `;
-
-  // --- CONTENITORE TABELLE ---
-  const containerStyle = cfg.orientation === 'horizontal' 
-    ? 'display: flex; flex-direction: row; gap: 20px; overflow-x: auto; align-items: flex-start; padding-bottom: 15px;' 
-    : 'display: flex; flex-direction: column; gap: 20px;';
-
-  html += `<div style="${containerStyle}">`;
-
-  const availableProducts = getAvailableProductsList();
-
-  cfg.distributors.forEach((d, dIdx) => {
-    const todayStr = d.date || new Date().toLocaleDateString('it-IT');
-
-    html += `
-      <div style="background:white; padding:12px; border-radius:8px; border:2px solid #8e44ad; min-width:780px; box-shadow:0 4px 6px rgba(0,0,0,0.05); flex-shrink:0;">
-        
-        <!-- HEADER SPECIFICO EXCEL -->
-        <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:0.85rem;">
-          <tr>
-            <td style="font-weight:bold; text-align:right; width:30%; padding:2px 5px;">Data:</td>
-            <td style="background:#f1f1f1; text-align:center; font-weight:bold; width:20%; border:1px solid #ccc;">${todayStr}</td>
-            <td style="width:10%;"></td>
-            <td style="background:#f1c40f; text-align:center; font-weight:bold; border:1px solid #b7950b;" colspan="2">
-              <input type="text" value="${esc(d.name || `MARS ${dIdx + 1}`)}" 
-                     style="width:90%; font-weight:bold; text-align:center; background:transparent; border:none; font-size:0.9rem;" 
-                     onchange="updateDistributorMeta(${dIdx}, 'name', this.value)">
-            </td>
-          </tr>
-          <tr>
-            <td style="font-weight:bold; text-align:right; padding:2px 5px;">Distributore n°:</td>
-            <td style="background:#fff; text-align:center; font-weight:bold; color:red; border:1px solid #ccc;">${dIdx + 1}</td>
-            <td colspan="3"></td>
-          </tr>
-          <tr>
-            <td style="font-weight:bold; text-align:right; padding:2px 5px;">Importo fondi resti:</td>
-            <td style="background:#fff; border:1px solid #ccc; text-align:center;">
-              <input type="number" value="${d.fondoResti ?? 35}" 
-                     style="width:100%; text-align:center; font-weight:bold; border:none;" 
-                     onchange="updateDistributorMeta(${dIdx}, 'fondoResti', this.value)">
-            </td>
-            <td colspan="3"></td>
-          </tr>
-        </table>
-
-        <!-- TABELLA PRODOTTI -->
-        <div style="overflow-x:auto;">
-          <table style="width:100%; font-size:0.75rem; border-collapse:collapse; text-align:center;" border="1" borderColor="#ddd">
-            <thead>
-              <tr style="background:#fcf3cf; color:#7d6608; font-weight:bold;">
-                <th style="padding:6px; min-width:140px;">PRODOTTO</th>
-                <th style="padding:6px; width:55px;">STOCK INIZIALE</th>`;
-
-    for (let i = 1; i <= maxInsCount; i++) {
-      html += `<th style="padding:4px; width:45px; background:#fef9e7;">INS.${i}</th>`;
-    }
-
-    html += `
-                <th style="padding:6px; width:65px; background:#f9e79f;">Somma inserimenti</th>
-                <th style="padding:6px; width:60px;">CONTA FINALE</th>
-                <th style="padding:6px; width:60px; background:#fadbd8;">VENDUTO</th>
-                <th style="padding:6px; width:65px;">PREZZO DI VENDITA</th>
-                <th style="padding:6px; width:70px; background:#d4efdf;">INCASSO</th>
-                <th style="padding:4px; width:30px;">❌</th>
-              </tr>
-            </thead>
-            <tbody>`;
-
-    let totIncassoDist = 0;
-    let totVendutoDist = 0;
-
-    (d.rows || []).forEach((r, rIdx) => {
-      const stIniz = parseFloat(r.stockIniziale) || 0;
-      let insSum = 0;
-      const insArray = r.insertions || [];
-      for (let i = 0; i < maxInsCount; i++) {
-        insSum += parseFloat(insArray[i]) || 0;
-      }
-
-      const sommaInserimenti = stIniz + insSum;
-      const cntFin = parseFloat(r.contaFinale) || 0;
-      const venduto = Math.max(0, sommaInserimenti - cntFin);
-      const prezzoVendita = parseFloat(r.prezzoVendita) || 0;
-      const incasso = venduto * prezzoVendita;
-
-      totVendutoDist += venduto;
-      totIncassoDist += incasso;
-
-      html += `
-        <tr>
-          <!-- Menu a tendina Prodotto -->
-          <td style="padding:2px; text-align:left;">
-            <select style="width:100%; font-size:0.75rem; border:none; background:transparent;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
-              <option value="">-- Seleziona --</option>
-              ${availableProducts.map(p => `<option value="${esc(p)}" ${r.product === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
-            </select>
-          </td>
-
-          <!-- Stock Iniziale -->
-          <td style="padding:2px;">
-            <input type="number" value="${r.stockIniziale ?? ''}" placeholder="0" 
-                   style="width:100%; text-align:center; border:none;" 
-                   onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)">
-          </td>`;
-
-      for (let i = 0; i < maxInsCount; i++) {
-        const valIns = insArray[i] ?? '';
-        html += `
-          <td style="padding:2px; background:#fefde8;">
-            <input type="number" value="${valIns}" placeholder="-" 
-                   style="width:100%; text-align:center; border:none; background:transparent;" 
-                   onchange="updateDistRowIns(${dIdx}, ${rIdx}, ${i}, this.value)">
-          </td>`;
-      }
-
-      html += `
-          <!-- Somma Inserimenti -->
-          <td style="font-weight:bold; background:#fbf2c4;">${sommaInserimenti}</td>
-
-          <!-- Conta Finale -->
-          <td style="padding:2px;">
-            <input type="number" value="${r.contaFinale ?? ''}" placeholder="0" 
-                   style="width:100%; text-align:center; font-weight:bold; color:#27ae60; border:1px solid #bbb; border-radius:3px;" 
-                   onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)">
-          </td>
-
-          <!-- Venduto -->
-          <td style="font-weight:bold; color:#c0392b; background:#fadbd8;">${venduto}</td>
-
-          <!-- Prezzo di Vendita -->
-          <td style="padding:2px;">
-            <input type="number" step="0.10" value="${r.prezzoVendita ?? ''}" placeholder="€ 0.00" 
-                   style="width:100%; text-align:center; border:none;" 
-                   onchange="updateDistRow(${dIdx}, ${rIdx}, 'prezzoVendita', this.value)">
-          </td>
-
-          <!-- Incasso -->
-          <td style="font-weight:bold; color:#1e8449; background:#d4efdf;">€ ${incasso.toFixed(2)}</td>
-
-          <!-- Tasto Eliminazione Riga -->
-          <td style="padding:2px;">
-            <button style="background:transparent; color:#e74c3c; border:none; cursor:pointer; font-weight:bold;" onclick="removeDistributorRow(${dIdx}, ${rIdx})">✕</button>
-          </td>
-        </tr>`;
-    });
-
-    html += `
-            </tbody>
-            <tfoot>
-              <tr style="background:#eaedd5; font-weight:bold;">
-                <td colspan="${2 + maxInsCount + 1}" style="text-align:right; padding:5px;">TOTALI:</td>
-                <td>-</td>
-                <td style="color:#c0392b;">${totVendutoDist} pz</td>
-                <td>-</td>
-                <td style="color:#1e8449; font-size:0.85rem;">€ ${totIncassoDist.toFixed(2)}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-          <button style="background:#8e44ad; color:white; border:none; padding:4px 10px; font-size:0.75rem; border-radius:4px; cursor:pointer; font-weight:bold;" 
-                  onclick="addDistributorRow(${dIdx})">
-            ➕ Aggiungi Prodotto
-          </button>
-        </div>
-
-      </div>`;
-  });
-
-  html += `</div></td></tr>`;
-  container.innerHTML = html;
-}
-
-/* --- CALLBACK ED EVENTI --- */
-
 function updateDistRow(dIdx, rIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
   if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
