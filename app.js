@@ -1029,7 +1029,7 @@ function syncDistributorsToGlobalStock() {
     (d.rows || []).forEach(r => {
       if (r.product && r.contaFinale !== "" && r.contaFinale !== null) {
         const val = parseFloat(r.contaFinale) || 0;
-        const key = r.product.trim().toLowerCase();
+        const key = String(r.product).trim().toLowerCase();
         totalsByProduct[key] = (totalsByProduct[key] || 0) + val;
       }
     });
@@ -1039,10 +1039,9 @@ function syncDistributorsToGlobalStock() {
     window.inventoryData.forEach(item => {
       const prodName = item.prodotto || item.product || item.name;
       if (prodName) {
-        const itemKey = prodName.trim().toLowerCase();
+        const itemKey = String(prodName).trim().toLowerCase();
         if (totalsByProduct[itemKey] !== undefined) {
           const val = totalsByProduct[itemKey];
-          // Aggiorniamo tutte le varianti possibili per garantire la compatibilità con la tabella
           item.effettivo = val;
           item.effettivoTotale = val;
           item.effettivo_totale = val;
