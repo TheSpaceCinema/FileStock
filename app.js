@@ -683,35 +683,79 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 
-// Helper per recuperare TUTTI i prodotti disponibili dall'inventario globale e dalle varie origini
+// Helper potenziato per recuperare TUTTI i prodotti dai magazzini classici, dal file storico e dalle globali
 function getAvailableProductsList() {
   let productsSet = new Set();
   
-  // 1. Estrae dinamicamente dall'inventario principale caricato (tutti i prodotti del magazzino)
+  // 1. Scansiona tutte le strutture multi-magazzino se presenti (es. oggetti o array di magazzini)
+  if (typeof warehouses !== 'undefined' && warehouses) {
+    if (Array.isArray(warehouses)) {
+      warehouses.forEach(w => {
+        const items = w.items || w.inventory || w.products || w;
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name);
+            if (name) productsSet.add(String(name).trim());
+          });
+        }
+      });
+    } else if (typeof warehouses === 'object') {
+      Object.values(warehouses).forEach(w => {
+        const items = w.items || w.inventory || w.products || w;
+        if (Array.isArray(items)) {
+          items.forEach(item => {
+            const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name);
+            if (name) productsSet.add(String(name).trim());
+          });
+        }
+      });
+    }
+  }
+
+  // 2. Estrae dall'inventario principale corrente (window.inventoryData)
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const name = item.prodotto || item.product || item.name;
-      if (name) productsSet.add(name.trim());
+      if (name) productsSet.add(String(name).trim());
     });
   }
 
-  // 2. Recupera da eventuali funzioni o liste globali definite altrove nel file
-  if (typeof getAllProducts === 'function') {
-    const prods = getAllProducts();
-    if (Array.isArray(prods)) {
-      prods.forEach(p => { if (p) productsSet.add(p.trim()); });
+  // 3. Controlla eventuali array storici o di importazione globale (file Historical)
+  ['historicalData', 'excelData', 'masterProducts', 'globalProductsList', 'loadedData', 'allProducts'].forEach(prop => {
+    if (window[prop] && Array.isArray(window[prop])) {
+      window[prop].forEach(item => {
+        const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name);
+        if (name) productsSet.add(String(name).trim());
+      });
     }
+  });
+
+  // 4. Recupera da funzioni globali se definite
+  if (typeof getAllProducts === 'function') {
+    try {
+      const prods = getAllProducts();
+      if (Array.isArray(prods)) {
+        prods.forEach(p => { 
+          const name = typeof p === 'string' ? p : (p.prodotto || p.product || p.name);
+          if (name) productsSet.add(String(name).trim()); 
+        });
+      }
+    } catch(e) { console.error(e); }
   }
+
   if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
-    window.globalProductsList.forEach(p => { if (p) productsSet.add(p.trim()); });
+    window.globalProductsList.forEach(p => { 
+      const name = typeof p === 'string' ? p : (p.prodotto || p.product || p.name);
+      if (name) productsSet.add(String(name).trim()); 
+    });
   }
 
-  // Se troviamo prodotti, restituisce l'elenco completo ordinato alfabeticamente
+  // Se trova prodotti, restituisce l'elenco completo unificato e ordinato alfabeticamente
   if (productsSet.size > 0) {
-    return Array.from(productsSet).sort();
+    return Array.from(productsSet).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
   }
 
-  // 3. Fallback di sicurezza se l'inventario non è ancora inizializzato
+  // 5. Fallback di sicurezza estrema se nessun dato è ancora inizializzato
   return [
     "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers", 
     "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
