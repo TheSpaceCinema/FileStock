@@ -433,45 +433,62 @@ function renderPostMixView() {
     html += `<li><b>${esc(p)}:</b> ${kg.toFixed(2)} Kg netti</li>`;
   }
   html += `</ul>`;
+// Contenitore principale per affiancare i 4 Blocchi in orizzontale
+  html += `<div style="display:flex; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%;">`;
 
- cfg.blocks.forEach((b, bIdx) => {
-  html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1;">`;
-  html += `<h5 style="color:#2980b9;">${esc(b.name)}</h5>`;
-  html += `<div style="margin-top:8px;">`;
-// 1. Definiamo lo stile del contenitore in base all'orientamento scelto
+  cfg.blocks.forEach((b, bIdx) => {
+    // Singolo blocco/espositore
+    html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1; min-width:320px; flex:1;">`;
+    html += `<h5 style="color:#2980b9;">${esc(b.name)}</h5>`;
+    html += `<div style="margin-top:8px;">`;
+
+    // 1. Gestione dello stile griglia e dell'ordine di lettura celle
     let gridStyle = '';
+    let cellOrder = [];
+
     if (cfg.orientation === 'horizontal') {
-      // ORIZZONTALE: Forza tutte le colonne su un'unica riga con scroll orizzontale
+      // ORIZZONTALE: N colonne fisse, legge prima tutte le colonne di una riga
       gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(85px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
+      for (let r = 0; r < b.rows; r++) {
+        for (let c = 0; c < b.columns; c++) {
+          cellOrder.push({ r, c });
+        }
+      }
     } else {
-      // VERTICALE: Dispone le celle dall'alto verso il basso per colonna
+      // VERTICALE: N righe fisse, legge prima tutte le righe di una colonna
       gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(85px, 1fr); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
-    }
-
-    // 2. Apriamo il div contenitore della griglia con lo stile dinamico
-    html += `<div style="${gridStyle}">`;
-
-    // 3. Generiamo direttamente le celle
-    for (let r = 0; r < b.rows; r++) {
       for (let c = 0; c < b.columns; c++) {
-        let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
-        let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
-
-        html += `
-          <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:85px;">
-            <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
-            <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
-              ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
-            </select>
-            <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
-              oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
-          </div>`;
+        for (let r = 0; r < b.rows; r++) {
+          cellOrder.push({ r, c });
+        }
       }
     }
 
-    // 4. Chiudiamo i div contenitori
-    html += '</div></div></div>';
+    // 2. Apriamo il contenitore delle celle
+    html += `<div style="${gridStyle}">`;
+
+    // 3. Generazione celle nell'ordine corretto
+    cellOrder.forEach(({ r, c }) => {
+      let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
+      let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+
+      html += `
+        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:85px;">
+          <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+          <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
+            ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
+          </select>
+          <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
+            oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
+        </div>`;
+    });
+
+    // 4. Chiudiamo i div del singolo blocco
+    html += `</div></div></div>`;
   });
+
+  // Chiudiamo il contenitore flex che affianca i blocchi
+  html += `</div>`;
 
   html += `</td></tr>`;
   container.innerHTML = html;
