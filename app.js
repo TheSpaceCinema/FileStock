@@ -683,7 +683,7 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 function getAvailableProductsList() {
-  if (!window._cachedAllProducts)
+  if (!window._cachedAllProducts) {
     window._cachedAllProducts = new Set([
       "3D Glasses component", "Acqua frizzante 50 cl", "Acqua frizzante 75 cl", 
       "Acqua Naturale", "Acqua naturale 50 cl", "Acqua Naturale 75 cl", 
