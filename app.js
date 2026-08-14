@@ -427,73 +427,67 @@ function renderPostMixView() {
   thead.innerHTML = `<tr><th colspan="10" style="background:#2980b9; color:white; font-size:1.1rem; padding:10px;">🥤 Post Mix e Sciroppi (${esc(cinemaName)})</th></tr>`;
 
   let html = `<tr><td colspan="10" style="padding:15px; background:#eaf2f8;">`;
+  
+  // Riepilogo Totali Sciroppi
   const totals = getPostMixProductTotals();
   html += `<h4>Totali Rilevati Sciroppi:</h4><ul style="margin-bottom:15px; font-size:0.9rem;">`;
-  for(let [p, kg] of Object.entries(totals)) {
-    html += `<li><b>${esc(p)}:</b> ${kg.toFixed(2)} Kg netti</li>`;
+  const productKeys = Object.keys(totals);
+  if (productKeys.length === 0) {
+    html += `<li style="color:#666;">Nessun dato inserito.</li>`;
+  } else {
+    for (let p of productKeys) {
+      html += `<li><b>${esc(p)}:</b> ${totals[p].toFixed(2)} Kg netti</li>`;
+    }
   }
   html += `</ul>`;
-// Contenitore principale per affiancare i 4 Blocchi in orizzontale
+
+  // Griglia dei Blocchi
   html += `<div style="display:flex; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%;">`;
 
   cfg.blocks.forEach((b, bIdx) => {
-    // Singolo blocco/espositore
     html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1; min-width:320px; flex:1;">`;
-    html += `<h5 style="color:#2980b9;">${esc(b.name)}</h5>`;
-    html += `<div style="margin-top:8px;">`;
+    html += `<h5 style="color:#2980b9; margin-bottom:10px;">${esc(b.name)}</h5>`;
 
-    // 1. Gestione dello stile griglia e dell'ordine di lettura celle
     let gridStyle = '';
     let cellOrder = [];
 
-    if (cfg.orientation && (cfg.orientation.toLowerCase() === 'horizontal' || cfg.orientation.toLowerCase() === 'orizzontale')) {
-      // ORIZZONTALE: N colonne fisse, legge prima tutte le colonne di una riga
-      gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(85px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
+    if (cfg.orientation === 'horizontal') {
+      gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(130px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
       for (let r = 0; r < b.rows; r++) {
-        for (let c = 0; c < b.columns; c++) {
-          cellOrder.push({ r, c });
-        }
+        for (let c = 0; c < b.columns; c++) cellOrder.push({ r, c });
       }
     } else {
-      // VERTICALE: N righe fisse, legge prima tutte le righe di una colonna
-      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(85px, 1fr); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
+      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(130px, 1fr); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
       for (let c = 0; c < b.columns; c++) {
-        for (let r = 0; r < b.rows; r++) {
-          cellOrder.push({ r, c });
-        }
+        for (let r = 0; r < b.rows; r++) cellOrder.push({ r, c });
       }
     }
 
-    // 2. Apriamo il contenitore delle celle
     html += `<div style="${gridStyle}">`;
 
-    // 3. Generazione celle nell'ordine corretto
     cellOrder.forEach(({ r, c }) => {
-      let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
-      let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+      let cell = b.gridValues?.[r]?.[c] || { prodName: "", weight: "" };
 
       html += `
-        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:85px;">
+        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:125px;">
           <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
-          <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
-            ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
+          <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" 
+                  onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, this.value, null)">
+            <option value="">-- Prodotto --</option>
+            ${postMixProducts.map(p => `<option value="${esc(p.name)}" ${cell.prodName === p.name ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
           </select>
-          <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
-            oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
+          <input type="number" step="any" placeholder="Kg Lordi" value="${cell.weight || ''}" 
+                 style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
+                 oninput="updatePostMixCell(${bIdx}, ${r}, ${c}, null, this.value)">
         </div>`;
     });
 
-    // 4. Chiudiamo i div del singolo blocco
-    html += `</div></div></div>`;
+    html += `</div></div>`;
   });
 
-  // Chiudiamo il contenitore flex che affianca i blocchi
-  html += `</div>`;
-
-  html += `</td></tr>`;
+  html += `</div></td></tr>`;
   container.innerHTML = html;
 }
-
 function updatePostMixCell(bIdx, r, c, prodName, weight) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
@@ -1090,35 +1084,51 @@ function renderTabs() {
   const bar = $("tabsBar");
   if (!bar) return;
   bar.innerHTML = "";
+
+  // 1. Tasto Impostazioni / Setup
+  const setupBtn = document.createElement("button");
+  setupBtn.className = `tab-btn ${currentTab === 'setup' ? 'active' : ''}`;
+  setupBtn.innerHTML = `⚙️ Impostazioni`;
+  setupBtn.onclick = () => { currentTab = 'setup'; switchTab(); };
+  bar.appendChild(setupBtn);
+
+  // 2. Tab Magazzini
   warehouses.forEach((w, idx) => {
     const btn = document.createElement("button");
     btn.className = `tab-btn ${currentTab === idx ? 'active' : ''}`;
-    btn.textContent = `📍 ${w}`;
+    btn.textContent = `📍 ${w.name}`;
     btn.onclick = () => { currentTab = idx; switchTab(); };
     bar.appendChild(btn);
   });
-  const btnCandy = document.createElement("button");
-  btnCandy.className = `tab-btn ${currentTab === 'candy' ? 'active' : ''}`;
-  btnCandy.textContent = `🍬 Caramelle`;
-  btnCandy.onclick = () => { currentTab = 'candy'; switchTab(); };
-  bar.appendChild(btnCandy);
-  const btnPostMix = document.createElement("button");
-  btnPostMix.className = `tab-btn ${currentTab === 'postmix' ? 'active' : ''}`;
-  btnPostMix.textContent = `🥤 Post Mix`;
-  btnPostMix.onclick = () => { currentTab = 'postmix'; switchTab(); };
-  bar.appendChild(btnPostMix);
-  const btnDist = document.createElement("button");
-  btnDist.className = `tab-btn ${currentTab === 'distributors' ? 'active' : ''}`;
-  btnDist.textContent = `🍫 Distributori`;
-  btnDist.onclick = () => { currentTab = 'distributors'; switchTab(); };
-  bar.appendChild(btnDist);
-  const totBtn = document.createElement("button");
-  totBtn.className = `tab-btn ${currentTab === 'tot' ? 'active' : ''}`;
-  totBtn.textContent = `📊 RIEPILOGO TOTALE`;
-  totBtn.onclick = () => { currentTab = 'tot'; switchTab(); };
-  bar.appendChild(totBtn);
-}
-function switchTab() {
+
+  // 3. Tab Caramelle
+  const candyBtn = document.createElement("button");
+  candyBtn.className = `tab-btn ${currentTab === 'candy' ? 'active' : ''}`;
+  candyBtn.innerHTML = `🍬 Caramelle`;
+  candyBtn.onclick = () => { currentTab = 'candy'; switchTab(); };
+  bar.appendChild(candyBtn);
+
+  // 4. Tab Post Mix
+  const postMixBtn = document.createElement("button");
+  postMixBtn.className = `tab-btn ${currentTab === 'postmix' ? 'active' : ''}`;
+  postMixBtn.innerHTML = `🥤 Post Mix`;
+  postMixBtn.onclick = () => { currentTab = 'postmix'; switchTab(); };
+  bar.appendChild(postMixBtn);
+
+  // 5. Tab Distributori
+  const distBtn = document.createElement("button");
+  distBtn.className = `tab-btn ${currentTab === 'distributors' ? 'active' : ''}`;
+  distBtn.innerHTML = `🍫 Distributori`;
+  distBtn.onclick = () => { currentTab = 'distributors'; switchTab(); };
+  bar.appendChild(distBtn);
+
+  // 6. Tab Riepilogo Totale
+  const summaryBtn = document.createElement("button");
+  summaryBtn.className = `tab-btn ${currentTab === 'summary' ? 'active' : ''}`;
+  summaryBtn.innerHTML = `📊 RIEPILOGO TOTALE`;
+  summaryBtn.onclick = () => { currentTab = 'summary'; switchTab(); };
+  bar.appendChild(summaryBtn);
+}nction switchTab() {
   renderTabs();
   if (currentTab === 'setup') {
     renderSetupView();
