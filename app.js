@@ -1041,15 +1041,18 @@ function syncDistributorsToGlobalStock() {
       if (prodName) {
         const itemKey = prodName.trim().toLowerCase();
         if (totalsByProduct[itemKey] !== undefined) {
-          // Assegna direttamente alla colonna "effettivo" (Effettivo Totale)
-          item.effettivo = totalsByProduct[itemKey];
+          const val = totalsByProduct[itemKey];
+          // Aggiorniamo tutte le varianti possibili per garantire la compatibilità con la tabella
+          item.effettivo = val;
+          item.effettivoTotale = val;
+          item.effettivo_totale = val;
         }
       }
     });
   }
 
   if (typeof updateGlobalStockFromDistributors === 'function') {
-    updateGlobalStockFromDistributors(totalsByProduct, 'effettivo');
+    updateGlobalStockFromDistributors(totalsByProduct, 'effettivoTotale');
   }
 
   if (typeof renderInventoryTable === 'function') {
@@ -1058,16 +1061,6 @@ function syncDistributorsToGlobalStock() {
     renderTable();
   }
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("button, [onclick*='riepilogo'], [onclick*='Riepilogo']").forEach(el => {
-    if (el.textContent.toLowerCase().includes("riepilogo") || (el.getAttribute("onclick") || "").toLowerCase().includes("riepilogo")) {
-      el.addEventListener("click", () => {
-        syncDistributorsToGlobalStock();
-      });
-    }
-  });
-});
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
