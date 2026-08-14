@@ -2007,7 +2007,7 @@ function render() {
   let kitPart = getKitContributionDetail(r.name, r.code);
   let baseRilevato = (boxVal * (r.boxSize || 0)) + (sleeveVal * (r.sleeveSize || 0)) + sfusoVal;
   
-  let effettivo = getGlobalRilevato(r.code, r) + baseRilevato; 
+  let effettivo = getGlobalRilevato(r.code, r);
   let diff = effettivo - (r.atteso || 0);
   let diffVal = diff * (r.standardCost || 0);
 
