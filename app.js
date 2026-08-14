@@ -623,6 +623,62 @@ function updatePostMixOrientation(val) {
   renderPostMixView();
 }
 
+/* --- CALLBACK PER BLOCCI, RIGHE E COLONNE POST MIX --- */
+
+// 1. Modifica il Numero di Blocchi
+function updatePostMixBlocksCount(val) {
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg) return;
+  const count = parseInt(val, 10);
+  if (isNaN(count) || count < 1) return;
+
+  cfg.blocksCount = count;
+  if (!cfg.blocks) cfg.blocks = [];
+
+  // Se aumenti i blocchi, aggiunge i nuovi
+  while (cfg.blocks.length < count) {
+    const nextIdx = cfg.blocks.length + 1;
+    cfg.blocks.push({
+      name: nextIdx === 1 ? 'Post Mix Principale' : `Post Mix Blocco ${nextIdx}`,
+      rows: 4,
+      columns: 6,
+      gridValues: {}
+    });
+  }
+
+  // Se riduci i blocchi, taglia la lista
+  if (cfg.blocks.length > count) {
+    cfg.blocks = cfg.blocks.slice(0, count);
+  }
+
+  savePostMixConfig();
+  renderPostMixView();
+}
+
+// 2. Modifica il Numero di Righe del singolo blocco
+function updatePostMixBlockRows(bIdx, val) {
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg || !cfg.blocks || !cfg.blocks[bIdx]) return;
+  const rows = parseInt(val, 10);
+  if (isNaN(rows) || rows < 1) return;
+
+  cfg.blocks[bIdx].rows = rows;
+  savePostMixConfig();
+  renderPostMixView();
+}
+
+// 3. Modifica il Numero di Colonne del singolo blocco
+function updatePostMixBlockCols(bIdx, val) {
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg || !cfg.blocks || !cfg.blocks[bIdx]) return;
+  const cols = parseInt(val, 10);
+  if (isNaN(cols) || cols < 1) return;
+
+  cfg.blocks[bIdx].columns = cols;
+  savePostMixConfig();
+  renderPostMixView();
+}
+
 /* --- RENDER DISTRIBUTORI --- */
 function renderDistributorsView() {
   const container = $("tbody");
