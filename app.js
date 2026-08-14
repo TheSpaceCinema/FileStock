@@ -670,13 +670,12 @@ function updatePostMixBlockCols(bIdx, val) {
 function getAvailableProductsList() {
   let productsSet = new Set();
   
-  // Aggiungi questo blocco per leggere i dati dall'array rows
- if (typeof rows !== 'undefined' && Array.isArray(rows)) {
-  rows.forEach(r => {
-    const name = r.name || r.prodotto || r.product || r.Descrizione || r.Articolo;
-    if (name) productsSet.add(name.trim());
-  });
-}
+  if (typeof rows !== 'undefined' && Array.isArray(rows)) {
+    rows.forEach(r => {
+      const name = r.name || r.prodotto || r.product || r.Descrizione || r.Articolo;
+      if (name) productsSet.add(name.trim());
+    });
+  }
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const name = item.prodotto || item.product || item.name;
@@ -703,6 +702,7 @@ function getAvailableProductsList() {
     "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
   ];
 }
+
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
@@ -711,7 +711,6 @@ function renderDistributorsView() {
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg.distributors) cfg.distributors = [];
   if (!cfg.orientation) cfg.orientation = 'horizontal';
-  if (!cfg.syncTarget) cfg.syncTarget = 'kit';
 
   syncDistributorsToGlobalStock();
 
@@ -747,14 +746,6 @@ function renderDistributorsView() {
             <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorOrientation(this.value)">
               <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>↔️ Orizzontale (Affiancati)</option>
               <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>↕️ Verticale (In Colonna)</option>
-            </select>
-          </div>
-
-          <div>
-            <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">Somma "Conta Finale" su:</label>
-            <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; font-weight:bold; color:#8e44ad;" onchange="updateDistributorSyncTarget(this.value)">
-              <option value="kit" ${cfg.syncTarget === 'kit' ? 'selected' : ''}>➕ Da Kit/Spec.</option>
-              <option value="effettivo" ${cfg.syncTarget === 'effettivo' ? 'selected' : ''}>📊 Effettivo Totale/Diff.</option>
             </select>
           </div>
         </div>
@@ -959,15 +950,6 @@ function updateDistributorOrientation(val) {
   renderDistributorsView();
 }
 
-function updateDistributorSyncTarget(val) {
-  const cfg = getActiveCinemaDistributorConfig();
-  cfg.syncTarget = val;
-  saveDistributorConfig();
-  syncDistributorsToGlobalStock();
-  if (typeof recalcKPIs === 'function') recalcKPIs();
-  renderDistributorsView();
-}
-
 function updateDistributorMeta(dIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
   if (cfg.distributors[dIdx]) {
@@ -1059,18 +1041,15 @@ function syncDistributorsToGlobalStock() {
       if (prodName) {
         const itemKey = prodName.trim().toLowerCase();
         if (totalsByProduct[itemKey] !== undefined) {
-          if (cfg.syncTarget === 'kit') {
-            item.kit = totalsByProduct[itemKey];
-          } else {
-            item.effettivo = totalsByProduct[itemKey];
-          }
+          // Assegna direttamente alla colonna "effettivo" (Effettivo Totale)
+          item.effettivo = totalsByProduct[itemKey];
         }
       }
     });
   }
 
   if (typeof updateGlobalStockFromDistributors === 'function') {
-    updateGlobalStockFromDistributors(totalsByProduct, cfg.syncTarget);
+    updateGlobalStockFromDistributors(totalsByProduct, 'effettivo');
   }
 
   if (typeof renderInventoryTable === 'function') {
@@ -1089,7 +1068,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
