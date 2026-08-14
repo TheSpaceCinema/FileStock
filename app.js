@@ -684,9 +684,13 @@ function getAvailableProductsList() {
   }
 
   if (typeof getAllProducts === 'function') {
-    const prods = getAllProducts();
-    if (Array.isArray(prods)) {
-      prods.forEach(p => { if (p) productsSet.add(p.trim()); });
+    try {
+      const prods = getAllProducts();
+      if (Array.isArray(prods)) {
+        prods.forEach(p => { if (p) productsSet.add(p.trim()); });
+      }
+    } catch (e) {
+      console.warn("getAllProducts non eseguibile:", e);
     }
   }
   if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
@@ -704,14 +708,15 @@ function getAvailableProductsList() {
 }
 
 function renderDistributorsView() {
-  const container = $("tbody");
-  const thead = $("thead");
+  const container = document.querySelector("tbody");
+  const thead = document.querySelector("thead");
   if (!container || !thead) return;
 
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg.distributors) cfg.distributors = [];
   if (!cfg.orientation) cfg.orientation = 'horizontal';
 
+  // Sincronizza i dati con lo stock generale in sicurezza
   syncDistributorsToGlobalStock();
 
   let maxInsCount = 5;
@@ -725,7 +730,8 @@ function renderDistributorsView() {
     });
   });
 
-  thead.innerHTML = `<tr><th colspan="25" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
+  const cName = (typeof cinemaName !== 'undefined') ? cinemaName : '';
+  thead.innerHTML = `<tr><th colspan="25" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cName)})</th></tr>`;
 
   let html = `<tr><td colspan="25" style="padding:15px; background:#f5eef8;">`;
 
@@ -843,7 +849,7 @@ function renderDistributorsView() {
       html += `
         <tr>
           <td style="padding:2px; text-align:left;">
-            <select style="width:100%; font-size:0.75rem; border:none; background:transparent;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
+            <select style="width:100%; font-size:0.75rem; border:1px solid #ccc; background:#fff; border-radius:3px; padding:2px;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
               <option value="">-- Seleziona --</option>
               ${availableProducts.map(p => `<option value="${esc(p)}" ${r.product === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
             </select>
@@ -921,7 +927,7 @@ function renderDistributorsView() {
 
 function updateDistRow(dIdx, rIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
+  if (cfg.distributors && cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
     cfg.distributors[dIdx].rows[rIdx][key] = val;
     saveDistributorConfig();
     syncDistributorsToGlobalStock();
@@ -932,7 +938,7 @@ function updateDistRow(dIdx, rIdx, key, val) {
 
 function updateDistRowIns(dIdx, rIdx, insIdx, val) {
   const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
+  if (cfg.distributors && cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
     const row = cfg.distributors[dIdx].rows[rIdx];
     if (!row.insertions) row.insertions = [];
     row.insertions[insIdx] = val !== "" ? parseFloat(val) || 0 : "";
@@ -952,7 +958,7 @@ function updateDistributorOrientation(val) {
 
 function updateDistributorMeta(dIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx]) {
+  if (cfg.distributors && cfg.distributors[dIdx]) {
     cfg.distributors[dIdx][key] = key === 'fondoResti' ? parseFloat(val) || 0 : val;
     saveDistributorConfig();
     if (typeof recalcKPIs === 'function') recalcKPIs();
@@ -995,7 +1001,7 @@ function updateDistributorsCount(val) {
 
 function addDistributorRow(dIdx) {
   const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx]) {
+  if (cfg.distributors && cfg.distributors[dIdx]) {
     if (!cfg.distributors[dIdx].rows) cfg.distributors[dIdx].rows = [];
     cfg.distributors[dIdx].rows.push({
       product: "",
@@ -1005,6 +1011,17 @@ function addDistributorRow(dIdx) {
       prezzoVendita: 1.50
     });
     saveDistributorConfig();
+    renderDistributorsView();
+  }
+}
+
+function removeDistributorRow(dIdx, rIdx) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors && cfg.distributors[dIdx] && cfg.distributors[dIdx].rows) {
+    cfg.distributors[dIdx].rows.splice(rIdx, 1);
+    saveDistributorConfig();
+    syncDistributorsToGlobalStock();
+    if (typeof recalcKPIs === 'function') recalcKPIs();
     renderDistributorsView();
   }
 }
@@ -1024,7 +1041,7 @@ function syncDistributorsToGlobalStock() {
     });
   });
 
-  // Aggiorna l'array globale 'rows' (utilizzato dalla tabella principale)
+  // Aggiorna l'array 'rows'
   if (typeof rows !== 'undefined' && Array.isArray(rows)) {
     rows.forEach(item => {
       const prodName = item.name || item.prodotto || item.product || item.Descrizione || item.Articolo;
@@ -1040,7 +1057,7 @@ function syncDistributorsToGlobalStock() {
     });
   }
 
-  // Aggiorna anche window.inventoryData se presente
+  // Aggiorna window.inventoryData
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const prodName = item.prodotto || item.product || item.name;
@@ -1057,17 +1074,35 @@ function syncDistributorsToGlobalStock() {
   }
 
   if (typeof updateGlobalStockFromDistributors === 'function') {
-    updateGlobalStockFromDistributors(totalsByProduct, 'effettivoTotale');
+    try {
+      updateGlobalStockFromDistributors(totalsByProduct, 'effettivoTotale');
+    } catch (e) {
+      console.warn("updateGlobalStockFromDistributors non riuscito:", e);
+    }
   }
 
+  // Aggiorna visivamente le tabelle di magazzino se esistono
   if (typeof renderInventoryTable === 'function') {
     renderInventoryTable();
   } else if (typeof renderTable === 'function') {
     renderTable();
-  } else if (typeof render === 'function') {
-    render();
   }
 }
+
+// Funzione jolly vuota per prevenire errori se chiamata da altre parti del codice
+function updateDistributorContaFinaleSum() {
+  // Disattivata: la conta finale viene sincronizzata direttamente
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("button, [onclick*='riepilogo'], [onclick*='Riepilogo']").forEach(el => {
+    if (el.textContent.toLowerCase().includes("riepilogo") || (el.getAttribute("onclick") || "").toLowerCase().includes("riepilogo")) {
+      el.addEventListener("click", () => {
+        syncDistributorsToGlobalStock();
+      });
+    }
+  });
+});
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
