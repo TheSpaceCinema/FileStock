@@ -683,27 +683,38 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 
-// Helper per recuperare tutti i prodotti disponibili dai magazzini o file storici
+// Helper per recuperare TUTTI i prodotti disponibili dall'inventario globale e dalle varie origini
 function getAvailableProductsList() {
+  let productsSet = new Set();
+  
+  // 1. Estrae dinamicamente dall'inventario principale caricato (tutti i prodotti del magazzino)
+  if (window.inventoryData && Array.isArray(window.inventoryData)) {
+    window.inventoryData.forEach(item => {
+      const name = item.prodotto || item.product || item.name;
+      if (name) productsSet.add(name.trim());
+    });
+  }
+
+  // 2. Recupera da eventuali funzioni o liste globali definite altrove nel file
   if (typeof getAllProducts === 'function') {
-    const res = getAllProducts();
-    if (Array.isArray(res) && res.length > 0) return res;
+    const prods = getAllProducts();
+    if (Array.isArray(prods)) {
+      prods.forEach(p => { if (p) productsSet.add(p.trim()); });
+    }
   }
-  if (window.globalProductsList && Array.isArray(window.globalProductsList) && window.globalProductsList.length > 0) {
-    return window.globalProductsList;
+  if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
+    window.globalProductsList.forEach(p => { if (p) productsSet.add(p.trim()); });
   }
-  if (window.allProducts && Array.isArray(window.allProducts) && window.allProducts.length > 0) {
-    return window.allProducts;
+
+  // Se troviamo prodotti, restituisce l'elenco completo ordinato alfabeticamente
+  if (productsSet.size > 0) {
+    return Array.from(productsSet).sort();
   }
-  if (window.inventory && Array.isArray(window.inventory)) {
-    const invProducts = window.inventory.map(item => item.product || item.name).filter(Boolean);
-    if (invProducts.length > 0) return [...new Set(invProducts)];
-  }
-  // Lista completa di fallback con tutti i prodotti storici
+
+  // 3. Fallback di sicurezza se l'inventario non è ancora inizializzato
   return [
-    "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", 
-    "Twix", "Mars", "Snickers", "Kinder Bueno", "Kinder Barrette", 
-    "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
+    "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers", 
+    "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
   ];
 }
 
@@ -716,6 +727,10 @@ function renderDistributorsView() {
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg.distributors) cfg.distributors = [];
   if (!cfg.orientation) cfg.orientation = 'horizontal';
+  if (!cfg.syncTarget) cfg.syncTarget = 'kit';
+
+  // Sincronizza subito in background per sicurezza
+  syncDistributorsToGlobalStock();
 
   // Calcola il numero massimo di colonne INS dinamiche (minimo 5)
   let maxInsCount = 5;
@@ -733,12 +748,12 @@ function renderDistributorsView() {
 
   let html = `<tr><td colspan="25" style="padding:15px; background:#f5eef8;">`;
 
-  // --- PANNELLO SUPERIORE (Controlli & Opzioni - Senza menu ridondanti) ---
+  // --- PANNELLO SUPERIORE (Controlli & Opzioni) ---
   html += `
     <div style="background:white; padding:15px; border-radius:8px; border:1px solid #d2b4de; margin-bottom:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
         
-        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
           <div>
             <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">N° Distributori:</label>
             <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorsCount(this.value)">
@@ -751,6 +766,14 @@ function renderDistributorsView() {
             <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorOrientation(this.value)">
               <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>↔️ Orizzontale (Affiancati)</option>
               <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>↕️ Verticale (In Colonna)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size:0.85rem; font-weight:bold; color:#666; display:block;">Somma "Conta Finale" su:</label>
+            <select style="padding:5px 10px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; font-weight:bold; color:#8e44ad;" onchange="updateDistributorSyncTarget(this.value)">
+              <option value="kit" ${cfg.syncTarget === 'kit' ? 'selected' : ''}>➕ Da Kit/Spec.</option>
+              <option value="effettivo" ${cfg.syncTarget === 'effettivo' ? 'selected' : ''}>📊 Effettivo Totale/Diff.</option>
             </select>
           </div>
         </div>
@@ -850,7 +873,7 @@ function renderDistributorsView() {
 
       html += `
         <tr>
-          <!-- Menu a tendina Prodotto (con tutti i prodotti disponibili) -->
+          <!-- Menu a tendina Prodotto -->
           <td style="padding:2px; text-align:left;">
             <select style="width:100%; font-size:0.75rem; border:none; background:transparent;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
               <option value="">-- Seleziona --</option>
@@ -943,7 +966,7 @@ function updateDistRow(dIdx, rIdx, key, val) {
     cfg.distributors[dIdx].rows[rIdx][key] = val;
     saveDistributorConfig();
     syncDistributorsToGlobalStock();
-    recalcKPIs();
+    if (typeof recalcKPIs === 'function') recalcKPIs();
     renderDistributorsView();
   }
 }
@@ -956,7 +979,7 @@ function updateDistRowIns(dIdx, rIdx, insIdx, val) {
     row.insertions[insIdx] = val !== "" ? parseFloat(val) || 0 : "";
     saveDistributorConfig();
     syncDistributorsToGlobalStock();
-    recalcKPIs();
+    if (typeof recalcKPIs === 'function') recalcKPIs();
     renderDistributorsView();
   }
 }
@@ -968,12 +991,21 @@ function updateDistributorOrientation(val) {
   renderDistributorsView();
 }
 
+function updateDistributorSyncTarget(val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  cfg.syncTarget = val;
+  saveDistributorConfig();
+  syncDistributorsToGlobalStock();
+  if (typeof recalcKPIs === 'function') recalcKPIs();
+  renderDistributorsView();
+}
+
 function updateDistributorMeta(dIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
   if (cfg.distributors[dIdx]) {
     cfg.distributors[dIdx][key] = key === 'fondoResti' ? parseFloat(val) || 0 : val;
     saveDistributorConfig();
-    recalcKPIs();
+    if (typeof recalcKPIs === 'function') recalcKPIs();
   }
 }
 
@@ -1007,7 +1039,7 @@ function updateDistributorsCount(val) {
 
   saveDistributorConfig();
   syncDistributorsToGlobalStock();
-  recalcKPIs();
+  if (typeof recalcKPIs === 'function') recalcKPIs();
   renderDistributorsView();
 }
 
@@ -1033,12 +1065,11 @@ function removeDistributorRow(dIdx, rIdx) {
     cfg.distributors[dIdx].rows.splice(rIdx, 1);
     saveDistributorConfig();
     syncDistributorsToGlobalStock();
-    recalcKPIs();
+    if (typeof recalcKPIs === 'function') recalcKPIs();
     renderDistributorsView();
   }
 }
 
-// Sincronizzazione automatica della Conta Finale sui magazzini globali senza bisogno di configurazione manuale
 function syncDistributorsToGlobalStock() {
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg || !cfg.distributors) return;
@@ -1053,17 +1084,81 @@ function syncDistributorsToGlobalStock() {
     });
   });
 
-  // Chiamata automatica alle funzioni globali di aggiornamento magazzino (Kit e Totale Effettivo)
-  if (typeof updateGlobalStockFromDistributors === 'function') {
-    updateGlobalStockFromDistributors(totalsByProduct, 'kit');
-    updateGlobalStockFromDistributors(totalsByProduct, 'effettivo');
+  // Aggiornamento diretto delle strutture globali e chiamata della funzione nativa se presente
+  if (window.inventoryData && Array.isArray(window.inventoryData)) {
+    window.inventoryData.forEach(item => {
+      const prodName = item.prodotto || item.product || item.name;
+      if (prodName && totalsByProduct[prodName] !== undefined) {
+        if (cfg.syncTarget === 'kit') {
+          item.kit = totalsByProduct[prodName];
+        } else {
+          item.effettivo = totalsByProduct[prodName];
+        }
+      }
+    });
   }
-  
-  if (typeof updateInventoryFromDistributors === 'function') {
-    updateInventoryFromDistributors(totalsByProduct);
+
+  if (typeof updateGlobalStockFromDistributors === 'function') {
+    updateGlobalStockFromDistributors(totalsByProduct, cfg.syncTarget);
   }
 }
 
+// Intercetta il passaggio alla tab di riepilogo per sincronizzare sempre i dati in tempo reale
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("button, [onclick*='riepilogo'], [onclick*='Riepilogo']").forEach(el => {
+    if (el.textContent.toLowerCase().includes("riepilogo") || (el.getAttribute("onclick") || "").toLowerCase().includes("riepilogo")) {
+      el.addEventListener("click", () => {
+        syncDistributorsToGlobalStock();
+      });
+    }
+  });
+});
+
+/* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
+function injectExcelTemplateButton() {
+  const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
+  if ($("exportTemplateBtnContainer")) return;
+  const btnContainer = document.createElement("div");
+  btnContainer.id = "exportTemplateBtnContainer";
+  btnContainer.className = "no-print";
+  btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
+  const exportTemplateBtn = document.createElement("button");
+  exportTemplateBtn.id = "btnExportExcelTemplate";
+  exportTemplateBtn.className = "btn btn-secondary";
+  exportTemplateBtn.innerHTML = "📋 Esporta Excel (Template Vuoto)";
+  exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
+  exportTemplateBtn.onclick = () => handleDynamicExport(true);
+  const exportCountsBtn = document.createElement("button");
+  exportCountsBtn.id = "btnExportExcelCounts";
+  exportCountsBtn.className = "btn btn-success";
+  exportCountsBtn.innerHTML = "📊 Esporta Report (Conteggi Rilevati)";
+  exportCountsBtn.style.cssText = "background: #27ae60; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
+  exportCountsBtn.onclick = () => handleDynamicExport(false);
+  btnContainer.appendChild(exportTemplateBtn);
+  btnContainer.appendChild(exportCountsBtn);
+  const titleEl = $("appTitle") || headerContainer;
+  if (titleEl && titleEl.parentNode) {
+    titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
+  } else {
+    document.body.insertBefore(btnContainer, document.body.firstChild);
+  }
+}
+
+function handleDynamicExport(isEmptyTemplate) {
+  if (currentTab === 'candy') {
+    exportCandyGridExcel(isEmptyTemplate);
+  } else if (currentTab === 'postmix') {
+    exportPostMixGridExcel(isEmptyTemplate);
+  } else if (currentTab === 'distributors') {
+    exportDistributorsExcel(isEmptyTemplate);
+  } else {
+    if (isEmptyTemplate) {
+      exportEmptyTemplateToExcel();
+    } else {
+      exportCurrentInventoryToExcel();
+    }
+  }
+}
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 
 function injectExcelTemplateButton() {
