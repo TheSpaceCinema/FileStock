@@ -679,37 +679,237 @@ function updatePostMixBlockCols(bIdx, val) {
   renderPostMixView();
 }
 
-/* --- RENDER DISTRIBUTORI --- */
+/* --- RENDER DISTRIBUTORI AUTOMATICI --- */
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
   if (!container || !thead) return;
+
   const cfg = getActiveCinemaDistributorConfig();
+  if (!cfg.distributors) cfg.distributors = [];
+
   thead.innerHTML = `<tr><th colspan="10" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
+
   let html = `<tr><td colspan="10" style="padding:15px; background:#f5eef8;">`;
-  cfg.distributors.forEach((d, dIdx) => {
-    html += `<div style="background:white; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #d2b4de;">
-              <h5 style="color:#8e44ad; margin-bottom:8px;">${esc(d.name)} — Fondo Resti: €${d.fondoResti}</h5>
-              <table style="width:100%; font-size:0.8rem; border-collapse:collapse;">
-                <thead>
-                  <tr style="background:#ebdef0;">
-                    <th style="padding:4px;">Prodotto</th>
-                    <th style="padding:4px;">Stock Iniziale</th>
-                    <th style="padding:4px;">Conta Finale</th>
-                  </tr>
-                </thead>
-                <tbody>`;
-    d.rows.forEach((r, rIdx) => {
-      html += `<tr>
-                <td><input type="text" value="${esc(r.product)}" placeholder="Nome Prodotto" style="width:100%; border:1px solid #ddd;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)"></td>
-                <td><input type="number" value="${r.stockIniziale}" style="width:100%; border:1px solid #ddd; text-align:center;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)"></td>
-                <td><input type="number" value="${r.contaFinale}" style="width:100%; border:1px solid #ddd; text-align:center; font-weight:bold;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)"></td>
-              </tr>`;
+
+  // --- 1. CALCOLO TOTALI GENERALI ---
+  let totIniziale = 0;
+  let totFinale = 0;
+  let totVenduto = 0;
+  let totFondoResti = 0;
+
+  cfg.distributors.forEach(d => {
+    totFondoResti += parseFloat(d.fondoResti) || 0;
+    (d.rows || []).forEach(r => {
+      const stIniz = parseFloat(r.stockIniziale) || 0;
+      const cntFin = parseFloat(r.contaFinale) || 0;
+      const venduto = Math.max(0, stIniz - cntFin);
+
+      totIniziale += stIniz;
+      totFinale += cntFin;
+      totVenduto += venduto;
     });
-    html += `</tbody></table></div>`;
   });
+
+  // --- 2. PANNELLO SUPERIORE (Riepilogo + Controlli) ---
+  html += `
+    <div style="background:white; padding:15px; border-radius:8px; border:1px solid #d2b4de; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; border-bottom:1px solid #f0e6f6; padding-bottom:10px; margin-bottom:12px;">
+        <h4 style="color:#8e44ad; margin:0;">📊 Riepilogo Totale Distributori</h4>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:0.85rem; font-weight:bold; color:#666;">Numero Distributori:</label>
+          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateDistributorsCount(this.value)">
+            ${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<option value="${n}" ${cfg.distributors.length === n ? 'selected' : ''}>${n} Distributori</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; text-align:center;">
+        <div style="background:#f9f4fc; padding:8px; border-radius:6px; border:1px solid #e8d8f0;">
+          <span style="font-size:0.75rem; color:#777; display:block;">Stock Iniziale</span>
+          <b style="font-size:1.1rem; color:#8e44ad;">${totIniziale} pz</b>
+        </div>
+        <div style="background:#f9f4fc; padding:8px; border-radius:6px; border:1px solid #e8d8f0;">
+          <span style="font-size:0.75rem; color:#777; display:block;">Conta Finale</span>
+          <b style="font-size:1.1rem; color:#27ae60;">${totFinale} pz</b>
+        </div>
+        <div style="background:#f9f4fc; padding:8px; border-radius:6px; border:1px solid #e8d8f0;">
+          <span style="font-size:0.75rem; color:#777; display:block;">Totale Venduto</span>
+          <b style="font-size:1.1rem; color:#e67e22;">${totVenduto} pz</b>
+        </div>
+        <div style="background:#f9f4fc; padding:8px; border-radius:6px; border:1px solid #e8d8f0;">
+          <span style="font-size:0.75rem; color:#777; display:block;">Fondo Resti Totale</span>
+          <b style="font-size:1.1rem; color:#2980b9;">€ ${totFondoResti.toFixed(2)}</b>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // --- 3. TABELLE SINGOLI DISTRIBUTORI ---
+  cfg.distributors.forEach((d, dIdx) => {
+    html += `
+      <div style="background:white; padding:15px; margin-bottom:20px; border-radius:8px; border:1px solid #d2b4de; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
+        
+        <!-- Header Distributore (Nome + Fondo Resti) -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; background:#f5eef8; padding:8px 12px; border-radius:6px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.1rem;">🍫</span>
+            <input type="text" value="${esc(d.name || `Distributore ${dIdx + 1}`)}" 
+                   placeholder="Nome Distributore" 
+                   style="font-size:1rem; font-weight:bold; color:#8e44ad; border:1px dashed #be90d4; padding:2px 6px; border-radius:4px; background:white;" 
+                   onchange="updateDistributorMeta(${dIdx}, 'name', this.value)">
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-size:0.8rem; font-weight:bold; color:#666;">Fondo Resti (€):</label>
+            <input type="number" step="any" value="${d.fondoResti ?? 0}" 
+                   style="width:90px; font-size:0.85rem; font-weight:bold; text-align:right; border:1px solid #be90d4; padding:3px; border-radius:4px;" 
+                   onchange="updateDistributorMeta(${dIdx}, 'fondoResti', this.value)">
+          </div>
+        </div>
+
+        <!-- Tabella Prodotti -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%; font-size:0.85rem; border-collapse:collapse;">
+            <thead>
+              <tr style="background:#ebdef0; color:#4a235a;">
+                <th style="padding:8px; text-align:left;">Prodotto</th>
+                <th style="padding:8px; text-align:center; width:120px;">Stock Iniziale</th>
+                <th style="padding:8px; text-align:center; width:120px;">Conta Finale</th>
+                <th style="padding:8px; text-align:center; width:100px;">Venduto</th>
+                <th style="padding:8px; text-align:center; width:50px;">Azione</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+    if (!d.rows || d.rows.length === 0) {
+      html += `<tr><td colspan="5" style="text-align:center; padding:12px; color:#888;">Nessun prodotto configurato. Clicca "+ Aggiungi Prodotto".</td></tr>`;
+    } else {
+      d.rows.forEach((r, rIdx) => {
+        const stIniz = parseFloat(r.stockIniziale) || 0;
+        const cntFin = parseFloat(r.contaFinale) || 0;
+        const venduto = Math.max(0, stIniz - cntFin);
+
+        html += `
+          <tr style="border-bottom:1px solid #f2e6f7;">
+            <td style="padding:6px;">
+              <input type="text" value="${esc(r.product || '')}" placeholder="Es. Snickers, Coca-Cola..." 
+                     style="width:100%; padding:4px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;" 
+                     onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
+            </td>
+            <td style="padding:6px; text-align:center;">
+              <input type="number" value="${r.stockIniziale ?? ''}" placeholder="0" 
+                     style="width:100%; text-align:center; padding:4px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;" 
+                     onchange="updateDistRow(${dIdx}, ${rIdx}, 'stockIniziale', this.value)">
+            </td>
+            <td style="padding:6px; text-align:center;">
+              <input type="number" value="${r.contaFinale ?? ''}" placeholder="0" 
+                     style="width:100%; text-align:center; padding:4px; font-weight:bold; color:#27ae60; border:1px solid #bbb; border-radius:4px; box-sizing:border-box;" 
+                     onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)">
+            </td>
+            <td style="padding:6px; text-align:center; font-weight:bold; color:#e67e22; background:#fff9f2;">
+              ${venduto} pz
+            </td>
+            <td style="padding:6px; text-align:center;">
+              <button title="Elimina Riga" 
+                      style="background:#e74c3c; color:white; border:none; padding:3px 7px; border-radius:4px; cursor:pointer; font-size:0.75rem;" 
+                      onclick="removeDistributorRow(${dIdx}, ${rIdx})">🗑️</button>
+            </td>
+          </tr>`;
+      });
+    }
+
+    html += `
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tasto Aggiungi Riga -->
+        <div style="margin-top:10px;">
+          <button style="background:#8e44ad; color:white; border:none; padding:6px 12px; font-size:0.8rem; border-radius:4px; cursor:pointer; font-weight:bold;" 
+                  onclick="addDistributorRow(${dIdx})">
+            ➕ Aggiungi Prodotto
+          </button>
+        </div>
+
+      </div>`;
+  });
+
   html += `</td></tr>`;
   container.innerHTML = html;
+}
+
+/* --- CALLBACK DISTRIBUTORI AUTOMATICI --- */
+
+// 1. Aggiorna dati singola riga (Prodotto, Stock Iniziale, Conta Finale)
+function updateDistRow(dIdx, rIdx, key, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows[rIdx]) {
+    cfg.distributors[dIdx].rows[rIdx][key] = val;
+    saveDistributorConfig();
+    recalcKPIs();
+    renderDistributorsView(); // Rinfresca per aggiornare i totali del venduto
+  }
+}
+
+// 2. Aggiorna Nome Distributore o Fondo Resti
+function updateDistributorMeta(dIdx, key, val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx]) {
+    cfg.distributors[dIdx][key] = key === 'fondoResti' ? parseFloat(val) || 0 : val;
+    saveDistributorConfig();
+    recalcKPIs();
+    renderDistributorsView();
+  }
+}
+
+// 3. Modifica il Numero di Distributori Attivi
+function updateDistributorsCount(val) {
+  const cfg = getActiveCinemaDistributorConfig();
+  const count = parseInt(val, 10);
+  if (isNaN(count) || count < 1) return;
+
+  if (!cfg.distributors) cfg.distributors = [];
+
+  while (cfg.distributors.length < count) {
+    const nextIdx = cfg.distributors.length + 1;
+    cfg.distributors.push({
+      name: `Distributore ${nextIdx}`,
+      fondoResti: 50,
+      rows: [
+        { product: "", stockIniziale: "", contaFinale: "" }
+      ]
+    });
+  }
+
+  if (cfg.distributors.length > count) {
+    cfg.distributors = cfg.distributors.slice(0, count);
+  }
+
+  saveDistributorConfig();
+  renderDistributorsView();
+}
+
+// 4. Aggiunge una nuova riga prodotto ad un distributore
+function addDistributorRow(dIdx) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx]) {
+    if (!cfg.distributors[dIdx].rows) cfg.distributors[dIdx].rows = [];
+    cfg.distributors[dIdx].rows.push({ product: "", stockIniziale: "", contaFinale: "" });
+    saveDistributorConfig();
+    renderDistributorsView();
+  }
+}
+
+// 5. Rimuove una riga da un distributore
+function removeDistributorRow(dIdx, rIdx) {
+  const cfg = getActiveCinemaDistributorConfig();
+  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows) {
+    cfg.distributors[dIdx].rows.splice(rIdx, 1);
+    saveDistributorConfig();
+    recalcKPIs();
+    renderDistributorsView();
+  }
 }
 
 function updateDistRow(dIdx, rIdx, key, val) {
