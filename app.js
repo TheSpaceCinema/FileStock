@@ -466,13 +466,25 @@ function renderPostMixView() {
   const container = $("tbody");
   const thead = $("thead");
   if (!container || !thead) return;
-  const cfg = getActiveCinemaPostMixConfig();
-  thead.innerHTML = `<tr><th colspan="10" style="background:#2980b9; color:white; font-size:1.1rem; padding:10px;">🥤 Post Mix e Sciroppi (${esc(cinemaName)})</th></tr>`;
-  let html = `<tr><td colspan="10" style="padding:15px; background:#eaf2f8;">`;
   
-  const totals = getPostMixProductTotals();
-  html += `<h4>Totali Rilevati Sciroppi:</h4><ul style="margin-bottom:15px; font-size:0.9rem;">`;
+  const cfg = getActiveCinemaPostMixConfig();
+  if (!cfg.orientation) cfg.orientation = 'vertical';
+
+  thead.innerHTML = `<tr><th colspan="10" style="background:#2980b9; color:white; font-size:1.1rem; padding:10px;">🥤 Post Mix e Sciroppi (${esc(cinemaName)})</th></tr>`;
+
+  let html = `<tr><td colspan="10" style="padding:15px; background:#eaf2f8;">`;
+
+  // --- PANNELLO SUPERIORE: Totali Rilevati + Controlli Blocchi & Orientamento ---
+  const totals = typeof getPostMixProductTotals === 'function' ? getPostMixProductTotals() : {};
   const productKeys = Object.keys(totals);
+
+  html += `
+    <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px; background:white; padding:15px; border-radius:8px; border:1px solid #aed6f1;">
+      <div>
+        <h4 style="color:#2980b9; margin:0 0 10px 0;">Totali Rilevati Sciroppi:</h4>
+        <ul style="margin:0; padding-left:20px; font-size:0.9rem;">
+  `;
+
   if (productKeys.length === 0) {
     html += `<li style="color:#666;">Nessun dato inserito.</li>`;
   } else {
@@ -480,35 +492,98 @@ function renderPostMixView() {
       html += `<li><b>${esc(p)}:</b> ${totals[p].toFixed(2)} Kg netti</li>`;
     }
   }
-  html += `</ul>`;
 
-const pmContainerStyle = (cfg.orientation === 'horizontal')
-  ? 'display:flex; flex-direction:row; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%; align-items:flex-start;'
-  : 'display:flex; flex-direction:column; gap:15px; width:100%;';
+  html += `
+        </ul>
+      </div>
 
-html += `<div style="${pmContainerStyle}">`;
+      <!-- Menù Blocchi e Orientamento -->
+      <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap; border-top:1px solid #eee; padding-top:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:0.85rem; font-weight:bold; color:#666;">Numero Blocchi:</label>
+          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updatePostMixBlocksCount(this.value)">
+            ${[1, 2, 3, 4, 5, 6].map(nOpt => `<option value="${nOpt}" ${cfg.blocksCount === nOpt ? 'selected' : ''}>${nOpt} Blocchi</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label style="font-size:0.85rem; font-weight:bold; color:#666;">Orientamento Griglia:</label>
+          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; background:#f0f8ff; font-weight:bold; color:#2980b9;" onchange="updatePostMixOrientation(this.value)">
+            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>⬇️ Verticale (dall'alto in basso)</option>
+            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>➡️ Orizzontale (da sinistra a destra)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Contenitore Flex per l'orientamento dei BLOCCHI
+  const pmContainerStyle = (cfg.orientation === 'horizontal')
+    ? 'display:flex; flex-direction:row; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%; align-items:flex-start;'
+    : 'display:flex; flex-direction:column; gap:15px; width:100%;';
+
+  html += `<div style="${pmContainerStyle}">`;
+
+  // Render dei singoli Blocchi
   cfg.blocks.forEach((b, bIdx) => {
-    html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1; min-width:320px; flex:1;">`;
-    html += `<h5 style="color:#2980b9; margin-bottom:10px;">${esc(b.name)}</h5>`;
+    const blockBoxStyle = (cfg.orientation === 'horizontal')
+      ? 'background:white; padding:15px; border-radius:8px; border:1px solid #aed6f1; min-width:340px; flex:1;'
+      : 'background:white; padding:15px; border-radius:8px; border:1px solid #aed6f1; width:100%; box-sizing:border-box;';
+
+    html += `
+      <div style="${blockBoxStyle}">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+          <h5 style="color:#2980b9; margin:0;">${esc(b.name)}</h5>
+          <div style="display:flex; gap:15px; align-items:center;">
+            <div style="display:flex; align-items:center; gap:5px;">
+              <label style="font-size:0.8rem; color:#666;">Righe:</label>
+              <select style="padding:2px 6px; font-size:0.8rem; border:1px solid #ccc; border-radius:4px;" onchange="updatePostMixBlockRows(${bIdx}, this.value)">
+                ${Array(10).fill(0).map((_, i) => `<option value="${i+1}" ${b.rows === (i+1) ? 'selected' : ''}>${i+1}</option>`).join('')}
+              </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:5px;">
+              <label style="font-size:0.8rem; color:#666;">Colonne:</label>
+              <select style="padding:2px 6px; font-size:0.8rem; border:1px solid #ccc; border-radius:4px;" onchange="updatePostMixBlockCols(${bIdx}, this.value)">
+                ${Array(35).fill(0).map((_, i) => `<option value="${i+1}" ${b.columns === (i+1) ? 'selected' : ''}>${i+1}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+    `;
+
     let gridStyle = '';
     let cellOrder = [];
+
     if (cfg.orientation === 'horizontal') {
-      gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(130px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
+      gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(130px, 1fr)); gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 5px;`;
       for (let r = 0; r < b.rows; r++) {
-        for (let c = 0; c < b.columns; c++) cellOrder.push({ r, c });
+        for (let c = 0; c < b.columns; c++) {
+          let num = (r * b.columns) + c + 1;
+          cellOrder.push({ r, c, num });
+        }
       }
     } else {
-      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(130px, 1fr); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
+      // VERTICALE
+      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(130px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding: 10px; background: #f4fbfd; border: 2px dashed #2980b9; border-radius: 6px;`;
       for (let c = 0; c < b.columns; c++) {
-        for (let r = 0; r < b.rows; r++) cellOrder.push({ r, c });
+        for (let r = 0; r < b.rows; r++) {
+          let num = (c * b.rows) + r + 1;
+          cellOrder.push({ r, c, num });
+        }
       }
     }
+
     html += `<div style="${gridStyle}">`;
-    cellOrder.forEach(({ r, c }) => {
+
+    cellOrder.forEach(({ r, c, num }) => {
       let cell = b.gridValues?.[r]?.[c] || { prodName: "", weight: "" };
+      let badgeBg = cfg.orientation === 'vertical' ? '#2980b9' : '#7f8c8d';
+
       html += `
-        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:125px;">
-          <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:125px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.75rem; font-weight:bold; background:${badgeBg}; color:white; padding:1px 5px; border-radius:3px;">N° ${num}</span>
+            <span style="font-size:0.65rem; color:#888;">R${r+1}-C${c+1}</span>
+          </div>
           <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" 
                   onchange="updatePostMixCell(${bIdx}, ${r}, ${c}, this.value, null)">
             <option value="">-- Prodotto --</option>
@@ -519,12 +594,13 @@ html += `<div style="${pmContainerStyle}">`;
                  oninput="updatePostMixCell(${bIdx}, ${r}, ${c}, null, this.value)">
         </div>`;
     });
+
     html += `</div></div>`;
   });
+
   html += `</div></td></tr>`;
   container.innerHTML = html;
 }
-
 function updatePostMixCell(bIdx, r, c, prodName, weight) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
