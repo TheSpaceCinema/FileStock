@@ -219,7 +219,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE) --- */
-/* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE) --- */
 function renderCandyView() {
   const container = $("tbody");
   const thead = $("thead");
@@ -269,14 +268,12 @@ function renderCandyView() {
     </div>
   `;
 
-  // === INIZIO MODIFICA: Contenitore Flex per l'orientamento dei BLOCCHI ===
   const blocksContainerStyle = (cfg.orientation === 'horizontal')
     ? 'display: flex; flex-direction: row; gap: 20px; overflow-x: auto; width: 100%; align-items: flex-start; padding-bottom: 10px;'
     : 'display: flex; flex-direction: column; gap: 20px; width: 100%;';
 
   html += `<div style="${blocksContainerStyle}">`;
 
-  // Render Blocchi
   cfg.blocks.forEach((b, bIdx) => {
     const blockBoxStyle = (cfg.orientation === 'horizontal')
       ? 'background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2; min-width:380px; flex:1;'
@@ -311,7 +308,6 @@ function renderCandyView() {
         }
       }
     } else {
-      // VERTICALE
       gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(115px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding: 10px; background: #fffdfa; border: 2px dashed #e67e22; border-radius: 6px;`;
       for (let c = 0; c < b.columns; c++) {
         for (let r = 0; r < b.rows; r++) {
@@ -341,9 +337,8 @@ function renderCandyView() {
     html += `</div></div>`;
   });
 
-  html += `</div>`; // === FINE MODIFICA: Chiusura container blocchi ===
+  html += `</div>`;
 
-  // Buste e Scorte Sfuse
   if (cfg.buste) {
     html += `
       <div style="margin-top:25px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
@@ -474,7 +469,6 @@ function renderPostMixView() {
 
   let html = `<tr><td colspan="10" style="padding:15px; background:#eaf2f8;">`;
 
-  // --- PANNELLO SUPERIORE: Totali Rilevati + Controlli Blocchi & Orientamento ---
   const totals = typeof getPostMixProductTotals === 'function' ? getPostMixProductTotals() : {};
   const productKeys = Object.keys(totals);
 
@@ -497,7 +491,6 @@ function renderPostMixView() {
         </ul>
       </div>
 
-      <!-- Menù Blocchi e Orientamento -->
       <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap; border-top:1px solid #eee; padding-top:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <label style="font-size:0.85rem; font-weight:bold; color:#666;">Numero Blocchi:</label>
@@ -516,14 +509,12 @@ function renderPostMixView() {
     </div>
   `;
 
-  // Contenitore Flex per l'orientamento dei BLOCCHI
   const pmContainerStyle = (cfg.orientation === 'horizontal')
     ? 'display:flex; flex-direction:row; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%; align-items:flex-start;'
     : 'display:flex; flex-direction:column; gap:15px; width:100%;';
 
   html += `<div style="${pmContainerStyle}">`;
 
-  // Render dei singoli Blocchi
   cfg.blocks.forEach((b, bIdx) => {
     const blockBoxStyle = (cfg.orientation === 'horizontal')
       ? 'background:white; padding:15px; border-radius:8px; border:1px solid #aed6f1; min-width:340px; flex:1;'
@@ -562,7 +553,6 @@ function renderPostMixView() {
         }
       }
     } else {
-      // VERTICALE
       gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(130px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding: 10px; background: #f4fbfd; border: 2px dashed #2980b9; border-radius: 6px;`;
       for (let c = 0; c < b.columns; c++) {
         for (let r = 0; r < b.rows; r++) {
@@ -601,6 +591,7 @@ function renderPostMixView() {
   html += `</div></td></tr>`;
   container.innerHTML = html;
 }
+
 function updatePostMixCell(bIdx, r, c, prodName, weight) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
@@ -623,9 +614,6 @@ function updatePostMixOrientation(val) {
   renderPostMixView();
 }
 
-/* --- CALLBACK PER BLOCCI, RIGHE E COLONNE POST MIX --- */
-
-// 1. Modifica il Numero di Blocchi
 function updatePostMixBlocksCount(val) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg) return;
@@ -635,7 +623,6 @@ function updatePostMixBlocksCount(val) {
   cfg.blocksCount = count;
   if (!cfg.blocks) cfg.blocks = [];
 
-  // Se aumenti i blocchi, aggiunge i nuovi
   while (cfg.blocks.length < count) {
     const nextIdx = cfg.blocks.length + 1;
     cfg.blocks.push({
@@ -646,7 +633,6 @@ function updatePostMixBlocksCount(val) {
     });
   }
 
-  // Se riduci i blocchi, taglia la lista
   if (cfg.blocks.length > count) {
     cfg.blocks = cfg.blocks.slice(0, count);
   }
@@ -655,7 +641,6 @@ function updatePostMixBlocksCount(val) {
   renderPostMixView();
 }
 
-// 2. Modifica il Numero di Righe del singolo blocco
 function updatePostMixBlockRows(bIdx, val) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg || !cfg.blocks || !cfg.blocks[bIdx]) return;
@@ -667,7 +652,6 @@ function updatePostMixBlockRows(bIdx, val) {
   renderPostMixView();
 }
 
-// 3. Modifica il Numero di Colonne del singolo blocco
 function updatePostMixBlockCols(bIdx, val) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg || !cfg.blocks || !cfg.blocks[bIdx]) return;
@@ -682,96 +666,37 @@ function updatePostMixBlockCols(bIdx, val) {
 /* ==========================================================================
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
+
 function getAvailableProductsList() {
   let productsSet = new Set();
+  
+  if (window.inventoryData && Array.isArray(window.inventoryData)) {
+    window.inventoryData.forEach(item => {
+      const name = item.prodotto || item.product || item.name;
+      if (name) productsSet.add(name.trim());
+    });
+  }
 
-  // Helper per estrarre il nome gestendo qualsiasi maiuscola/minuscola da Excel
-  const extractName = (item) => {
-    if (!item) return null;
-    if (typeof item === 'string') return item;
-    return item.Prodotto || item.prodotto || item.PRODOTTO || 
-           item.Product || item.product || item.PRODUCT || 
-           item.Name || item.name || item.NAME || 
-           item.Nome || item.NOME || 
-           item.descrizione || item.Descrizione || item.DESCRIZIONE;
-  };
-
-  // 1. Scansiona tutte le possibili variabili globali di inventario/magazzino
-  const globalSources = [
-    window.inventoryData,
-    window.masterInventory,
-    window.allProducts,
-    window.loadedData,
-    window.historicalData,
-    window.excelData,
-    window.dbData
-  ];
-
-  globalSources.forEach(source => {
-    if (Array.isArray(source)) {
-      source.forEach(item => {
-        const name = extractName(item);
-        if (name && typeof name === 'string' && name.trim() !== '' && !name.includes('🍫') && !name.toLowerCase().includes('distributori')) {
-          productsSet.add(name.trim());
-        }
-      });
+  if (typeof getAllProducts === 'function') {
+    const prods = getAllProducts();
+    if (Array.isArray(prods)) {
+      prods.forEach(p => { if (p) productsSet.add(p.trim()); });
     }
-  });
-
-  // 2. Controlla strutture a magazzini multipli (es. warehouses)
-  if (typeof warehouses !== 'undefined' && warehouses) {
-    const wList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses);
-    wList.forEach(w => {
-      const items = w.items || w.inventory || w.products || w || (Array.isArray(w) ? w : null);
-      if (Array.isArray(items)) {
-        items.forEach(item => {
-          const name = extractName(item);
-          if (name && typeof name === 'string' && name.trim() !== '') {
-            productsSet.add(name.trim());
-          }
-        });
-      }
-    });
+  }
+  if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
+    window.globalProductsList.forEach(p => { if (p) productsSet.add(p.trim()); });
   }
 
-  // 3. Scansiona dinamicamente qualsiasi oggetto globale in memoria
-  for (let key in window) {
-    try {
-      const val = window[key];
-      if (Array.isArray(val) && val.length > 0) {
-        val.forEach(item => {
-          if (item && typeof item === 'object') {
-            const name = extractName(item);
-            if (name && typeof name === 'string' && name.trim() !== '' && !name.includes('🍫') && !name.toLowerCase().includes('distributori')) {
-              productsSet.add(name.trim());
-            }
-          }
-        });
-      }
-    } catch (e) {}
+  if (productsSet.size > 0) {
+    return Array.from(productsSet).sort();
   }
 
-  // 4. Aggiunge anche i prodotti già selezionati nei distributori correnti
-  const cfg = typeof getActiveCinemaDistributorConfig === 'function' ? getActiveCinemaDistributorConfig() : null;
-  if (cfg && cfg.distributors) {
-    cfg.distributors.forEach(d => {
-      (d.rows || []).forEach(r => {
-        if (r.product && r.product.trim() !== '') {
-          productsSet.add(r.product.trim());
-        }
-      });
-    });
-  }
-
-  // Se non ha trovato nulla, usa un piccolo fallback di sicurezza
-  if (productsSet.size === 0) {
-    return ["3D Glasses component", "Acqua frizzante 50 cl", "Bounty", "Mars", "Twix", "Snickers"];
-  }
-
-  // Restituisce l'elenco completo, pulito e ordinato alfabeticamente
-  return Array.from(productsSet).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
+  return [
+    "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers", 
+    "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
+  ];
 }
-/* --- RENDER DISTRIBUTORI AUTOMATICI --- */
+
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
@@ -782,10 +707,8 @@ function renderDistributorsView() {
   if (!cfg.orientation) cfg.orientation = 'horizontal';
   if (!cfg.syncTarget) cfg.syncTarget = 'kit';
 
-  // Sincronizza subito in background per sicurezza
   syncDistributorsToGlobalStock();
 
-  // Calcola il numero massimo di colonne INS dinamiche (minimo 5)
   let maxInsCount = 5;
   cfg.distributors.forEach(d => {
     (d.rows || []).forEach(r => {
@@ -801,7 +724,6 @@ function renderDistributorsView() {
 
   let html = `<tr><td colspan="25" style="padding:15px; background:#f5eef8;">`;
 
-  // --- PANNELLO SUPERIORE (Controlli & Opzioni) ---
   html += `
     <div style="background:white; padding:15px; border-radius:8px; border:1px solid #d2b4de; margin-bottom:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
@@ -838,7 +760,6 @@ function renderDistributorsView() {
     </div>
   `;
 
-  // --- CONTENITORE TABELLE ---
   const containerStyle = cfg.orientation === 'horizontal' 
     ? 'display: flex; flex-direction: row; gap: 20px; overflow-x: auto; align-items: flex-start; padding-bottom: 15px;' 
     : 'display: flex; flex-direction: column; gap: 20px;';
@@ -853,7 +774,6 @@ function renderDistributorsView() {
     html += `
       <div style="background:white; padding:12px; border-radius:8px; border:2px solid #8e44ad; min-width:780px; box-shadow:0 4px 6px rgba(0,0,0,0.05); flex-shrink:0;">
         
-        <!-- HEADER SPECIFICO EXCEL -->
         <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:0.85rem;">
           <tr>
             <td style="font-weight:bold; text-align:right; width:30%; padding:2px 5px;">Data:</td>
@@ -881,7 +801,6 @@ function renderDistributorsView() {
           </tr>
         </table>
 
-        <!-- TABELLA PRODOTTI -->
         <div style="overflow-x:auto;">
           <table style="width:100%; font-size:0.75rem; border-collapse:collapse; text-align:center;" border="1" borderColor="#ddd">
             <thead>
@@ -926,7 +845,6 @@ function renderDistributorsView() {
 
       html += `
         <tr>
-          <!-- Menu a tendina Prodotto -->
           <td style="padding:2px; text-align:left;">
             <select style="width:100%; font-size:0.75rem; border:none; background:transparent;" onchange="updateDistRow(${dIdx}, ${rIdx}, 'product', this.value)">
               <option value="">-- Seleziona --</option>
@@ -934,7 +852,6 @@ function renderDistributorsView() {
             </select>
           </td>
 
-          <!-- Stock Iniziale -->
           <td style="padding:2px;">
             <input type="number" value="${r.stockIniziale ?? ''}" placeholder="0" 
                    style="width:100%; text-align:center; border:none;" 
@@ -952,30 +869,24 @@ function renderDistributorsView() {
       }
 
       html += `
-          <!-- Somma Inserimenti -->
           <td style="font-weight:bold; background:#fbf2c4;">${sommaInserimenti}</td>
 
-          <!-- Conta Finale -->
           <td style="padding:2px;">
             <input type="number" value="${r.contaFinale ?? ''}" placeholder="0" 
                    style="width:100%; text-align:center; font-weight:bold; color:#27ae60; border:1px solid #bbb; border-radius:3px;" 
                    onchange="updateDistRow(${dIdx}, ${rIdx}, 'contaFinale', this.value)">
           </td>
 
-          <!-- Venduto -->
           <td style="font-weight:bold; color:#c0392b; background:#fadbd8;">${venduto}</td>
 
-          <!-- Prezzo di Vendita -->
           <td style="padding:2px;">
             <input type="number" step="0.10" value="${r.prezzoVendita ?? ''}" placeholder="€ 0.00" 
                    style="width:100%; text-align:center; border:none;" 
                    onchange="updateDistRow(${dIdx}, ${rIdx}, 'prezzoVendita', this.value)">
           </td>
 
-          <!-- Incasso -->
           <td style="font-weight:bold; color:#1e8449; background:#d4efdf;">€ ${incasso.toFixed(2)}</td>
 
-          <!-- Tasto Eliminazione Riga -->
           <td style="padding:2px;">
             <button style="background:transparent; color:#e74c3c; border:none; cursor:pointer; font-weight:bold;" onclick="removeDistributorRow(${dIdx}, ${rIdx})">✕</button>
           </td>
@@ -1010,8 +921,6 @@ function renderDistributorsView() {
   html += `</div></td></tr>`;
   container.innerHTML = html;
 }
-
-/* --- CALLBACK ED EVENTI --- */
 
 function updateDistRow(dIdx, rIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
@@ -1132,14 +1041,12 @@ function syncDistributorsToGlobalStock() {
     (d.rows || []).forEach(r => {
       if (r.product && r.contaFinale !== "" && r.contaFinale !== null) {
         const val = parseFloat(r.contaFinale) || 0;
-        // Normalizzazione della chiave per evitare problemi di spazi o maiuscole/minuscole
         const key = r.product.trim().toLowerCase();
         totalsByProduct[key] = (totalsByProduct[key] || 0) + val;
       }
     });
   });
 
-  // Aggiornamento diretto delle strutture globali con confronto flessibile
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const prodName = item.prodotto || item.product || item.name;
@@ -1160,7 +1067,6 @@ function syncDistributorsToGlobalStock() {
     updateGlobalStockFromDistributors(totalsByProduct, cfg.syncTarget);
   }
 
-  // Forza il re-render immediato della tabella di riepilogo a schermo
   if (typeof renderInventoryTable === 'function') {
     renderInventoryTable();
   } else if (typeof renderTable === 'function') {
@@ -1168,7 +1074,6 @@ function syncDistributorsToGlobalStock() {
   }
 }
 
-// Intercetta il passaggio alla tab di riepilogo per sincronizzare sempre i dati in tempo reale
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("button, [onclick*='riepilogo'], [onclick*='Riepilogo']").forEach(el => {
     if (el.textContent.toLowerCase().includes("riepilogo") || (el.getAttribute("onclick") || "").toLowerCase().includes("riepilogo")) {
@@ -1224,7 +1129,6 @@ function handleDynamicExport(isEmptyTemplate) {
     }
   }
 }
-/* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 
 function exportCandyGridExcel(isEmpty) {
   const cfg = getActiveCinemaCandyConfig();
@@ -1945,7 +1849,7 @@ function build() {
   if ($("mainStatus")) $("mainStatus").style.display = "none";
   if ($("setupView")) $("setupView").style.display = "none";
   if ($("tabContent")) $("tabContent").style.display = "block";
-  if (typeof currentTab === 'string' && currentTab !== 'tot' && currentTab !== 'candy' && currentTab !== 'postmix' && currentTab !== 'distributors') currentTab = 0;
+  if (typeof currentTab === 'string' && currentTab !== 'tot' && currentTab !== 'candy' && currentTab !== 'postmix' && currentTab !== 'distributors' && currentTab !== 'summary') currentTab = 0;
   renderTabs();
   render();
 }
@@ -2037,7 +1941,7 @@ function render() {
   const q = $("search") ? norm($("search").value) : "";
   const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
   if ($("count")) $("count").textContent = `${data.length} prodotti`;
-  const isTotTab = (currentTab === 'tot');
+  const isTotTab = (currentTab === 'summary' || currentTab === 'tot');
   
   if ($("thead")) {
     $("thead").innerHTML = `
@@ -2047,146 +1951,96 @@ function render() {
         <th colspan="2" class="grp-box" style="background: #e3f2fd; color: #0d47a1;">BOX</th>
         <th colspan="2" class="grp-sleeve" style="background: #f3e5f5; color: #4a148c;">SLEEVE</th>
         <th class="grp-sfuso" style="background: #fff9c4; color: #f57f17;">SFUSO</th>
-        <th colspan="5" style="background: #212529; color: white;">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
-        <th colspan="2" class="grp-valore" style="background: #ffebee; color: #b71c1c;">VALORIZZAZIONE</th>
+        <th colspan="7" style="background: #212529; color: white;">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
       </tr>
-      <tr style="position: sticky; top: 41px; z-index: 20; background: #343a40; color: white;">
-        <th style="background: #343a40; color: white;">Prodotto</th>
-        <th style="background: #343a40; color: white;">U.M.</th>
-        <th class="num" style="background: #343a40; color: white;">Iniziale</th>
-        <th class="num" style="background: #343a40; color: white;">Danni</th>
-        <th class="num" style="background: #343a40; color: white;">Venduto</th>
-        <th class="num grp-box" style="background: #bbdefb; color: #0d47a1;">Size</th>
-        <th class="grp-box" style="background: #bbdefb; color: #0d47a1;">Q.tà Box</th>
-        <th class="num grp-sleeve" style="background: #e1bee7; color: #4a148c;">Size</th>
-        <th class="grp-sleeve" style="background: #e1bee7; color: #4a148c;">Q.tà Sleeve</th>
-        <th class="grp-sfuso" style="background: #fff59d; color: #f57f17;">Q.tà Sfuso</th>
-        <th class="num" style="background: #343a40; color: white;">Atteso</th>
-        <th class="num" style="background: #343a40; color: white;">Rilevato Base</th>
-        <th class="num" style="background: #e3f2fd; color: #0d47a1;">➕ Da Kit/Spec.</th>
-        <th class="num" style="background: #343a40; color: white;">Effettivo Totale</th>
-        <th class="num" style="background: #343a40; color: white;">Diff. Totale</th>
-        <th class="num grp-valore" style="background: #ffcdd2; color: #b71c1c;">Costo Unit.</th>
-        <th class="num grp-valore" style="background: #ffcdd2; color: #b71c1c;">Diff. Valore</th>
+      <tr style="position: sticky; top: 35px; z-index: 20; background: #343a40; color: white; font-size: 0.8rem;">
+        <th>Prodotto</th>
+        <th>U.M.</th>
+        <th>Iniziale</th>
+        <th>Danni</th>
+        <th>Venduto</th>
+        <th class="grp-box">Size</th>
+        <th class="grp-box">Q.tà</th>
+        <th class="grp-sleeve">Size</th>
+        <th class="grp-sleeve">Q.tà</th>
+        <th class="grp-sfuso">Q.tà Sfuso</th>
+        <th>Atteso</th>
+        <th>Rilevato Base</th>
+        <th>Da Kit</th>
+        <th>Effettivo Totale</th>
+        <th>Diff. Totale</th>
+        <th>Costo Unit.</th>
+        <th>Diff. Valore</th>
       </tr>
     `;
   }
-  if ($("tbody")) {
-    $("tbody").innerHTML = "";
-    data.forEach(r => {
-      const tr = document.createElement("tr");
-      if (r.isKit) {
-        tr.style.backgroundColor = "#e3f2fd";
-        tr.style.borderLeft = "4px solid #1976d2";
-      }
-      let totBoxLocal = 0, totSleeveLocal = 0, totSfusoLocal = 0;
-      if (isTotTab) {
-        warehouses.forEach((_, wIdx) => {
-          const cWh = getCount(wIdx, r.code);
-          totBoxLocal += sumArr(cWh.box);
-          totSleeveLocal += sumArr(cWh.sleeve);
-          totSfusoLocal += sumArr(cWh.sfuso);
-        });
-      } else {
-        const c = getCount(currentTab, r.code);
-        totBoxLocal = sumArr(c.box);
-        totSleeveLocal = sumArr(c.sleeve);
-        totSfusoLocal = sumArr(c.sfuso);
-      }
-      const baseRilevato = (totBoxLocal * r.boxSize) + (totSleeveLocal * r.sleeveSize) + totSfusoLocal;
-      const kitPart = getKitContributionDetail(r.name, r.code);
-      const effettivoTotaleComplesso = getGlobalRilevato(r.code, r);
-      const diffTotale = effettivoTotaleComplesso - r.atteso;
-      const diffValore = diffTotale * (r.standardCost || 0);
-      tr.innerHTML = `
-        <td style="${r.isKit ? 'font-weight:bold; color:#0d47a1;' : ''}">${r.isKit ? '📦 ' : ''}${esc(r.name)}</td>
+  
+  const tbody = $("tbody");
+  if (!tbody) return;
+  let html = "";
+  
+  data.forEach((r) => {
+    let boxVal = 0, sleeveVal = 0, sfusoVal = 0;
+    if (!isTotTab && typeof currentTab === 'number') {
+      const c = getCount(currentTab, r.code);
+      boxVal = c.box[0] || 0;
+      sleeveVal = c.sleeve[0] || 0;
+      sfusoVal = c.sfuso[0] || 0;
+    } else if (isTotTab) {
+      warehouses.forEach((_, wIdx) => {
+        const cWh = getCount(wIdx, r.code);
+        boxVal += sumArr(cWh.box);
+        sleeveVal += sumArr(cWh.sleeve);
+        sfusoVal += sumArr(cWh.sfuso);
+      });
+    }
+    
+    let kitPart = getKitContributionDetail(r.name, r.code);
+    let effettivo = getGlobalRilevato(r.code, r);
+    let diff = effettivo - (r.atteso || 0);
+    let diffVal = diff * (r.standardCost || 0);
+    let baseRilevato = (boxVal * (r.boxSize || 0)) + (sleeveVal * (r.sleeveSize || 0)) + sfusoVal;
+    
+    html += `
+      <tr>
+        <td><b>${esc(r.name)}</b><br><small style="color:#666">${esc(r.code)}</small></td>
         <td>${esc(r.uom)}</td>
-        <td class="num">${fmt(r.iniziale)}</td>
-        <td class="num">${fmt(r.danni)}</td>
-        <td class="num">${fmt(r.venduto)}</td>
-        <td class="num grp-box">${r.boxSize ? fmt(r.boxSize) : '-'}</td>
-        <td class="grp-box">${isTotTab ? fmt(totBoxLocal) : renderMultiInput(currentTab, r.code, 'box', r.boxSize)}</td>
-        <td class="num grp-sleeve">${r.sleeveSize ? fmt(r.sleeveSize) : '-'}</td>
-        <td class="grp-sleeve">${isTotTab ? fmt(totSleeveLocal) : renderMultiInput(currentTab, r.code, 'sleeve', r.sleeveSize)}</td>
-        <td class="num grp-sfuso">${isTotTab ? fmt(totSfusoLocal) : renderMultiInput(currentTab, r.code, 'sfuso', 1)}</td>
-        <td class="num">${fmt(r.atteso)}</td>
-        <td class="num">${fmt(baseRilevato)}</td>
-        <td class="num" style="background:#f0f4f8; font-weight:bold; color:#1976d2;">${fmt(kitPart)}</td>
-        <td class="num cell-eff" id="eff-${r.code}">${fmt(effettivoTotaleComplesso)}</td>
-        <td class="num cell-diff ${diffTotale === 0 ? 'ok' : 'bad'}" id="diff-${r.code}">${fmt(diffTotale)}</td>
-        <td class="num grp-valore">€ ${fmtMoney(r.standardCost || 0)}</td>
-        <td class="num grp-valore cell-val ${diffValore >= 0 ? 'ok' : 'bad'}" id="val-${r.code}">€ ${fmtMoney(diffValore)}</td>
-      `;
-      $("tbody").appendChild(tr);
-    });
-  }
+        <td>${fmt(r.iniziale)}</td>
+        <td>${fmt(r.danni)}</td>
+        <td>${fmt(r.venduto)}</td>
+        <td class="grp-box">${r.boxSize || '-'}</td>
+        <td class="grp-box">
+          ${isTotTab ? fmt(boxVal) : `<input type="number" value="${boxVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'box', 0, this.value)">`}
+        </td>
+        <td class="grp-sleeve">${r.sleeveSize || '-'}</td>
+        <td class="grp-sleeve">
+          ${isTotTab ? fmt(sleeveVal) : `<input type="number" value="${sleeveVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'sleeve', 0, this.value)">`}
+        </td>
+        <td class="grp-sfuso">
+          ${isTotTab ? fmt(sfusoVal) : `<input type="number" value="${sfusoVal}" style="width:60px; text-align:center;" oninput="updateCount(${currentTab}, '${r.code}', 'sfuso', 0, this.value)">`}
+        </td>
+        <td><b>${fmt(r.atteso)}</b></td>
+        <td>${fmt(baseRilevato)}</td>
+        <td>${fmt(kitPart)}</td>
+        <td><b>${fmt(effettivo)}</b></td>
+        <td style="color: ${diff < 0 ? 'red' : 'green'}"><b>${fmt(diff)}</b></td>
+        <td>€ ${fmtMoney(r.standardCost)}</td>
+        <td style="color: ${diffVal < 0 ? 'red' : 'green'}"><b>€ ${fmtMoney(diffVal)}</b></td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
   recalcKPIs();
 }
 
-function renderMultiInput(whIdx, code, fieldType, unitSize) {
+function updateCount(whIdx, code, type, fieldIdx, val) {
   const c = getCount(whIdx, code);
-  const arr = c[fieldType] || [0];
-  
-  const isDisabled = (fieldType === 'box' && (!unitSize || unitSize <= 0)) || 
-                     (fieldType === 'sleeve' && (!unitSize || unitSize <= 0));
-  if (isDisabled) {
-    return `<span style="color: #adb5bd; font-size: 0.8rem; font-style: italic;">N/D</span>`;
-  }
-  
-  return arr.map((val, idx) => `
-    <div style="display: inline-flex; align-items: center; gap: 4px; margin: 2px;">
-      <input type="number" step="any" value="${val || ''}" style="width: 60px; padding: 3px; text-align: center;" 
-             oninput="updateCountField(${whIdx}, '${code}', '${fieldType}', ${idx}, this.value)">
-    </div>
-  `).join('') + `
-    <button onclick="addCountField(${whIdx}, '${code}', '${fieldType}')" style="padding: 2px 6px; font-size: 0.75rem; cursor:pointer;" title="Aggiungi campo" class="no-print">+</button>
-  `;
-}
-
-function updateCountField(whIdx, code, fieldType, idx, val) {
-  const c = getCount(whIdx, code);
-  c[fieldType][idx] = n(val);
+  c[type][fieldIdx] = n(val);
   saveCountsToStorage();
-  
-  const r = rows.find(x => x.code === code);
-  if (r) {
-    const eff = getGlobalRilevato(code, r);
-    const diff = eff - r.atteso;
-    const diffVal = diff * (r.standardCost || 0);
-    
-    const effEl = document.getElementById(`eff-${code}`);
-    const diffEl = document.getElementById(`diff-${code}`);
-    const valEl = document.getElementById(`val-${code}`);
-    
-    if (effEl) effEl.textContent = fmt(eff);
-    if (diffEl) {
-      diffEl.textContent = fmt(diff);
-      diffEl.className = `num cell-diff ${diff === 0 ? 'ok' : 'bad'}`;
-    }
-    if (valEl) {
-      valEl.textContent = `€ ${fmtMoney(diffVal)}`;
-      valEl.className = `num grp-valore cell-val ${diffVal >= 0 ? 'ok' : 'bad'}`;
-    }
-  }
+  syncDistributorsToGlobalStock();
   recalcKPIs();
-}
-
-function addCountField(whIdx, code, fieldType) {
-  const c = getCount(whIdx, code);
-  c[fieldType].push(0);
-  saveCountsToStorage();
-  render();
 }
 
 function recalcKPIs() {
-  let totAtteso = 0, totRilevato = 0, totDiffValore = 0;
-  rows.forEach(r => {
-    totAtteso += r.atteso;
-    const eff = getGlobalRilevato(r.code, r);
-    totRilevato += eff;
-    totDiffValore += (eff - r.atteso) * (r.standardCost || 0);
-  });
-  if ($("kpiAtteso")) $("kpiAtteso").textContent = fmt(totAtteso);
-  if ($("kpiRilevato")) $("kpiRilevato").textContent = fmt(totRilevato);
-  if ($("kpiValore")) $("kpiValore").textContent = `€ ${fmtMoney(totDiffValore)}`;
+  // Funzione di supporto per ricalcoli KPI se presenti nella UI
 }
