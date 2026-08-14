@@ -446,7 +446,7 @@ function renderPostMixView() {
     let gridStyle = '';
     let cellOrder = [];
 
-    if (cfg.orientation === 'horizontal') {
+    if (cfg.orientation && (cfg.orientation.toLowerCase() === 'horizontal' || cfg.orientation.toLowerCase() === 'orizzontale')) {
       // ORIZZONTALE: N colonne fisse, legge prima tutte le colonne di una riga
       gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(85px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
       for (let r = 0; r < b.rows; r++) {
