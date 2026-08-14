@@ -1079,7 +1079,7 @@ function syncDistributorsToGlobalStock() {
     });
   }
 
-  // Cerca e attiva qualsiasi funzione di salvataggio globale esistente nell'app
+  // Salva i dati se la funzione di salvataggio esiste
   if (updated) {
     ['saveInventory', 'saveData', 'save', 'salvaDati', 'saveToLocalStorage', 'saveRows'].forEach(fnName => {
       if (typeof window[fnName] === 'function') {
@@ -1093,15 +1093,8 @@ function syncDistributorsToGlobalStock() {
       updateGlobalStockFromDistributors(totalsByProduct, 'effettivoTotale');
     } catch (e) {}
   }
-
-  // Ridisegna la tabella principale
-  if (typeof renderInventoryTable === 'function') {
-    renderInventoryTable();
-  } else if (typeof renderTable === 'function') {
-    renderTable();
-  } else if (typeof render === 'function') {
-    render();
-  }
+  
+  // (Nota: rimosse le chiamate a render() per evitare il loop di blocco)
 }
 
 // Funzione jolly vuota per prevenire errori se chiamata da altre parti del codice
