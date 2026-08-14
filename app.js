@@ -1043,74 +1043,53 @@ function syncDistributorsToGlobalStock() {
 
   let updated = false;
 
-  // Aggiorna l'array globale 'rows'
+  const updateItemStock = (item) => {
+    const prodName = item.name || item.prodotto || item.product || item.Descrizione || item.Articolo;
+    if (!prodName) return;
+    const itemKey = String(prodName).trim().toLowerCase();
+    
+    if (totalsByProduct[itemKey] !== undefined) {
+      const val = totalsByProduct[itemKey];
+      // Assegna il valore a tutte le possibili varianti di campi totali/effettivi
+      item.effettivo = val;
+      item.effettivoTotale = val;
+      item.effettivo_totale = val;
+      item.totaleEffettivo = val;
+      item.distributori = val;
+      updated = true;
+    }
+  };
+
+  // Aggiorna l'array 'rows'
   if (typeof rows !== 'undefined' && Array.isArray(rows)) {
-    rows.forEach(item => {
-      const prodName = item.name || item.prodotto || item.product || item.Descrizione || item.Articolo;
-      if (prodName) {
-        const itemKey = String(prodName).trim().toLowerCase();
-        if (totalsByProduct[itemKey] !== undefined) {
-          const val = totalsByProduct[itemKey];
-          item.effettivo = val;
-          item.effettivoTotale = val;
-          item.effettivo_totale = val;
-          item.totaleEffettivo = val;
-          updated = true;
-        }
-      }
-    });
+    rows.forEach(updateItemStock);
   }
 
   // Aggiorna window.inventoryData
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
-    window.inventoryData.forEach(item => {
-      const prodName = item.prodotto || item.product || item.name;
-      if (prodName) {
-        const itemKey = String(prodName).trim().toLowerCase();
-        if (totalsByProduct[itemKey] !== undefined) {
-          const val = totalsByProduct[itemKey];
-          item.effettivo = val;
-          item.effettivoTotale = val;
-          item.effettivo_totale = val;
-          item.totaleEffettivo = val;
-          updated = true;
-        }
-      }
-    });
+    window.inventoryData.forEach(updateItemStock);
   }
 
-  // Salva i dati se la funzione di salvataggio esiste
-  if (updated) {
-    ['saveInventory', 'saveData', 'save', 'salvaDati', 'saveToLocalStorage', 'saveRows'].forEach(fnName => {
-      if (typeof window[fnName] === 'function') {
-        try { window[fnName](); } catch (e) {}
-      }
-    });
-  }
+  // Attiva le funzioni di ricalcolo KPI/Totali globali se presenti nell'app
+  ['recalcKPIs', 'calculateTotals', 'updateTotals', 'recalculate'].forEach(fnName => {
+    if (typeof window[fnName] === 'function') {
+      try { window[fnName](); } catch (e) {}
+    }
+  });
+
+  // Salva i dati in modo persistente
+  ['saveInventory', 'saveData', 'save', 'salvaDati', 'saveToLocalStorage', 'saveRows'].forEach(fnName => {
+    if (typeof window[fnName] === 'function') {
+      try { window[fnName](); } catch (e) {}
+    }
+  });
 
   if (typeof updateGlobalStockFromDistributors === 'function') {
     try {
       updateGlobalStockFromDistributors(totalsByProduct, 'effettivoTotale');
     } catch (e) {}
   }
-  
-  // (Nota: rimosse le chiamate a render() per evitare il loop di blocco)
 }
-
-// Funzione jolly vuota per prevenire errori se chiamata da altre parti del codice
-function updateDistributorContaFinaleSum() {
-  // Disattivata: la conta finale viene sincronizzata direttamente
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("button, [onclick*='riepilogo'], [onclick*='Riepilogo']").forEach(el => {
-    if (el.textContent.toLowerCase().includes("riepilogo") || (el.getAttribute("onclick") || "").toLowerCase().includes("riepilogo")) {
-      el.addEventListener("click", () => {
-        syncDistributorsToGlobalStock();
-      });
-    }
-  });
-});
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
