@@ -671,13 +671,12 @@ function getAvailableProductsList() {
   let productsSet = new Set();
   
   // Aggiungi questo blocco per leggere i dati dall'array rows
-  if (typeof rows !== 'undefined' && Array.isArray(rows)) {
-    rows.forEach(r => {
-      const name = r.name || r.prodotto || r.product;
-      if (name) productsSet.add(name.trim());
-    });
-  }
-
+ if (typeof rows !== 'undefined' && Array.isArray(rows)) {
+  rows.forEach(r => {
+    const name = r.name || r.prodotto || r.product || r.Descrizione || r.Articolo;
+    if (name) productsSet.add(name.trim());
+  });
+}
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const name = item.prodotto || item.product || item.name;
