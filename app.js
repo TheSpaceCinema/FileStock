@@ -219,6 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE) --- */
+/* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE) --- */
 function renderCandyView() {
   const container = $("tbody");
   const thead = $("thead");
@@ -249,7 +250,6 @@ function renderCandyView() {
           </div>
         `).join('')}
       </div>
-
       <!-- Menù Blocchi e Orientamento -->
       <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap; border-top:1px solid #eee; padding-top:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -261,17 +261,28 @@ function renderCandyView() {
         <div style="display:flex; align-items:center; gap:8px;">
           <label style="font-size:0.85rem; font-weight:bold; color:#666;">Orientamento Griglia:</label>
           <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; background:#fff8f0; font-weight:bold; color:#d35400;" onchange="updateCandyOrientation(this.value)">
-            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>⬇️ Verticale (per Colonna)</option>
-            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>➡️ Orizzontale (per Riga)</option>
+            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>⬇️ Verticale (dall'alto in basso)</option>
+            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>➡️ Orizzontale (da sinistra a destra)</option>
           </select>
         </div>
       </div>
     </div>
   `;
 
+  // === INIZIO MODIFICA: Contenitore Flex per l'orientamento dei BLOCCHI ===
+  const blocksContainerStyle = (cfg.orientation === 'horizontal')
+    ? 'display: flex; flex-direction: row; gap: 20px; overflow-x: auto; width: 100%; align-items: flex-start; padding-bottom: 10px;'
+    : 'display: flex; flex-direction: column; gap: 20px; width: 100%;';
+
+  html += `<div style="${blocksContainerStyle}">`;
+
   // Render Blocchi
   cfg.blocks.forEach((b, bIdx) => {
-    html += `<div style="margin-top:15px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
+    const blockBoxStyle = (cfg.orientation === 'horizontal')
+      ? 'background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2; min-width:380px; flex:1;'
+      : 'background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2; width:100%; box-sizing:border-box;';
+
+    html += `<div style="${blockBoxStyle}">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
                 <h5 style="color:#e67e22; margin:0;">${esc(b.name)}</h5>
                 <div style="display:flex; gap:15px; align-items:center;">
@@ -289,10 +300,8 @@ function renderCandyView() {
                   </div>
                 </div>
               </div>`;
-
     let gridStyle = '';
     let cellOrder = [];
-
     if (cfg.orientation === 'horizontal') {
       gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 5px;`;
       for (let r = 0; r < b.rows; r++) {
@@ -302,7 +311,7 @@ function renderCandyView() {
         }
       }
     } else {
-      // VERTICALE: evidenziata con bordo e numerazione dall'alto verso il basso
+      // VERTICALE
       gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(115px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding: 10px; background: #fffdfa; border: 2px dashed #e67e22; border-radius: 6px;`;
       for (let c = 0; c < b.columns; c++) {
         for (let r = 0; r < b.rows; r++) {
@@ -311,13 +320,11 @@ function renderCandyView() {
         }
       }
     }
-
     html += `<div style="${gridStyle}">`;
     cellOrder.forEach(({ r, c, num }) => {
       let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
       let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
       let badgeBg = cfg.orientation === 'vertical' ? '#e67e22' : '#7f8c8d';
-
       html += `
         <div style="border:1px solid #ddd; padding:6px; text-align:center; background:white; border-radius:6px; display:flex; flex-direction:column; gap:4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -333,6 +340,8 @@ function renderCandyView() {
     });
     html += `</div></div>`;
   });
+
+  html += `</div>`; // === FINE MODIFICA: Chiusura container blocchi ===
 
   // Buste e Scorte Sfuse
   if (cfg.buste) {
@@ -473,7 +482,11 @@ function renderPostMixView() {
   }
   html += `</ul>`;
 
-  html += `<div style="display:flex; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%;">`;
+const pmContainerStyle = (cfg.orientation === 'horizontal')
+  ? 'display:flex; flex-direction:row; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%; align-items:flex-start;'
+  : 'display:flex; flex-direction:column; gap:15px; width:100%;';
+
+html += `<div style="${pmContainerStyle}">`;
   cfg.blocks.forEach((b, bIdx) => {
     html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1; min-width:320px; flex:1;">`;
     html += `<h5 style="color:#2980b9; margin-bottom:10px;">${esc(b.name)}</h5>`;
