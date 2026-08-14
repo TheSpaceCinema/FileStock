@@ -1127,8 +1127,10 @@ function renderTabs() {
   summaryBtn.className = `tab-btn ${currentTab === 'summary' ? 'active' : ''}`;
   summaryBtn.innerHTML = `📊 RIEPILOGO TOTALE`;
   summaryBtn.onclick = () => { currentTab = 'summary'; switchTab(); };
-  bar.appendChild(summaryBtn);
-}nction switchTab() {
+bar.appendChild(summaryBtn);
+}
+
+function switchTab() {
   renderTabs();
   if (currentTab === 'setup') {
     renderSetupView();
