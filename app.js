@@ -218,15 +218,20 @@ function renderCandyView() {
   if (!container || !thead) return;
 
   const cfg = getActiveCinemaCandyConfig();
+
+  // Imposta "vertical" di DEFAULT se non è stato ancora salvato nulla
+  if (!cfg.orientation) cfg.orientation = 'vertical';
+
   thead.innerHTML = `<tr><th colspan="10" style="background:#d35400; color:white; font-size:1.1rem; padding:10px;">🍬 Gestione Inserimento Caramelle (${esc(cinemaName)})</th></tr>`;
   
   let html = `<tr><td colspan="10" style="padding:20px; background:#fff3e0;">`;
   
   // Sezione Superiore: Totale, 4 Caselle Tare, Menù a tendina Blocco e Orientamento
+  const totalKg = typeof getCandyTotalKg === 'function' ? getCandyTotalKg() : 0;
   html += `
     <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
-        <h3 style="color:#d35400; margin:0;">Totale Netto Caramelle: <span id="candyTotalKgDisplay">${getCandyTotalKg().toFixed(2)} Kg</span></h3>
+        <h3 style="color:#d35400; margin:0;">Totale Netto Caramelle: <span id="candyTotalKgDisplay">${totalKg.toFixed(2)} Kg</span></h3>
       </div>
       
       <!-- 4 Caselle di testo per le tare -->
@@ -235,7 +240,7 @@ function renderCandyView() {
         ${[0,1,2,3].map(i => `
           <div style="display:flex; align-items:center; gap:4px;">
             <span style="font-size:0.75rem; color:#666;">T${i+1}:</span>
-            <input type="number" step="any" value="${cfg.tares[i] !== undefined ? cfg.tares[i] : ''}" placeholder="0.00" 
+            <input type="number" step="any" value="${cfg.tares?.[i] !== undefined ? cfg.tares[i] : ''}" placeholder="0.00" 
               style="width:70px; padding:4px; text-align:center; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;"
               oninput="updateCandyTareInput(${i}, this.value)">
           </div>
@@ -261,7 +266,7 @@ function renderCandyView() {
     </div>
   `;
 
-  // Render dei Blocchi con menù a tendina per Righe e Colonne in ciascuno
+  // Render dei Blocchi con menù a tendina per Righe e Colonne
   cfg.blocks.forEach((b, bIdx) => {
     html += `<div style="margin-top:15px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
@@ -280,55 +285,76 @@ function renderCandyView() {
                     </select>
                   </div>
                 </div>
-              </div>
-              <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 12)}, 1fr); gap:8px; margin-top:8px; overflow-x:auto; padding-bottom:5px;">`;
-    
-    for(let r=0; r<b.rows; r++) {
-      for(let c=0; c<b.columns; c++) {
-        let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
-        let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+              </div>`;
 
-        html += `
-          <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
-            <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
-            <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
-              ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
-            </select>
-            <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
-              oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
-          </div>`;
+    // Costruzione DINAMICA della griglia CSS (Gestisce sia Verticale che Orizzontale)
+    let gridStyle = '';
+    let cellOrder = [];
+
+    if (cfg.orientation === 'horizontal') {
+      gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 5px;`;
+      for (let r = 0; r < b.rows; r++) {
+        for (let c = 0; c < b.columns; c++) cellOrder.push({ r, c });
+      }
+    } else {
+      // Disposizione VERTICALE (ordinata per colonna dall'alto verso il basso)
+      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(110px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 5px;`;
+      for (let c = 0; c < b.columns; c++) {
+        for (let r = 0; r < b.rows; r++) cellOrder.push({ r, c });
       }
     }
+
+    html += `<div style="${gridStyle}">`;
+
+    cellOrder.forEach(({ r, c }) => {
+      let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
+      let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+
+      html += `
+        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
+          <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+          <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
+            ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
+          </select>
+          <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
+            oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
+        </div>`;
+    });
+
     html += `</div></div>`;
   });
 
   // Sezione Buste e Scorte Sfuse
-  html += `
-    <div style="margin-top:25px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
-      <h5 style="color:#e67e22; margin-bottom:10px;">📦 Gestione Buste e Scorte Sfuse</h5>
-      <p style="font-size:0.85rem; color:#666; margin-bottom:12px;">Inserisci i Kg lordi e il numero di sleeve per ciascuna busta.</p>
-      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:10px;">
-  `;
-
-  cfg.buste.forEach((busta, bIdx) => {
+  if (cfg.buste) {
     html += `
-      <div style="border:1px solid #ddd; padding:10px; border-radius:6px; background:#fafafa; display:flex; flex-direction:column; gap:6px;">
-        <span style="font-size:0.8rem; font-weight:bold; color:#444;">Busta ${bIdx + 1}</span>
-        <div style="display:flex; gap:6px;">
-          <div style="flex:1;">
-            <label style="font-size:0.7rem; color:#666; display:block;">Kg Lordi</label>
-            <input type="number" step="any" value="${busta.kg || ''}" placeholder="0.00" style="width:100%; padding:4px; text-align:center; font-size:0.85rem;" oninput="updateBustaData(${bIdx}, 'kg', this.value)">
-          </div>
-          <div style="flex:1;">
-            <label style="font-size:0.7rem; color:#666; display:block;">Sleeve (Pz)</label>
-            <input type="number" step="any" value="${busta.sleeve || ''}" placeholder="0" style="width:100%; padding:4px; text-align:center; font-size:0.85rem;" oninput="updateBustaData(${bIdx}, 'sleeve', this.value)">
+      <div style="margin-top:25px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
+        <h5 style="color:#e67e22; margin-bottom:10px;">📦 Gestione Buste e Scorte Sfuse</h5>
+        <p style="font-size:0.85rem; color:#666; margin-bottom:12px;">Inserisci i Kg lordi e il numero di sleeve per ciascuna busta.</p>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:10px;">
+    `;
+
+    cfg.buste.forEach((busta, bIdx) => {
+      html += `
+        <div style="border:1px solid #ddd; padding:10px; border-radius:6px; background:#fafafa; display:flex; flex-direction:column; gap:6px;">
+          <span style="font-size:0.8rem; font-weight:bold; color:#444;">Busta ${bIdx + 1}</span>
+          <div style="display:flex; gap:6px;">
+            <div style="flex:1;">
+              <label style="font-size:0.7rem; color:#666; display:block;">Kg Lordi</label>
+              <input type="number" step="any" value="${busta.kg || ''}" placeholder="0.00" style="width:100%; padding:4px; text-align:center; font-size:0.85rem;" oninput="updateBustaData(${bIdx}, 'kg', this.value)">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:0.7rem; color:#666; display:block;">Sleeve (Pz)</label>
+              <input type="number" step="any" value="${busta.sleeve || ''}" placeholder="0" style="width:100%; padding:4px; text-align:center; font-size:0.85rem;" oninput="updateBustaData(${bIdx}, 'sleeve', this.value)">
+            </div>
           </div>
         </div>
-      </div>
-    `;
-  });
+      `;
+    });
 
-  html += `</div></div></td></tr>`;
+    html += `</div></div>`;
+  }
+
+  html += `</td></tr>`;
   container.innerHTML = html;
 }
 
@@ -1110,7 +1136,7 @@ function renderTabs() {
   warehouses.forEach((w, idx) => {
     const btn = document.createElement("button");
     btn.className = `tab-btn ${currentTab === idx ? 'active' : ''}`;
-    btn.textContent = `📍 ${w.name}`;
+    btn.textContent = `📍 ${w.name || w.nome || ('Magazzino ' + (idx + 1))}`;
     btn.onclick = () => { currentTab = idx; switchTab(); };
     bar.appendChild(btn);
   });
