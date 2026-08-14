@@ -683,82 +683,61 @@ function updatePostMixBlockCols(bIdx, val) {
    MODULO DISTRIBUTORI AUTOMATICI (Integrazione Excel & Magazzino)
    ========================================================================== */
 
-// Helper potenziato per recuperare TUTTI i prodotti dai magazzini classici, dal file storico e dalle globali
+// Helper per recuperare TUTTI i prodotti senza filtri e senza fallback limitanti
 function getAvailableProductsList() {
   let productsSet = new Set();
-  
-  // 1. Scansiona tutte le strutture multi-magazzino se presenti (es. oggetti o array di magazzini)
-  if (typeof warehouses !== 'undefined' && warehouses) {
-    if (Array.isArray(warehouses)) {
-      warehouses.forEach(w => {
-        const items = w.items || w.inventory || w.products || w;
-        if (Array.isArray(items)) {
-          items.forEach(item => {
-            const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name);
-            if (name) productsSet.add(String(name).trim());
-          });
-        }
-      });
-    } else if (typeof warehouses === 'object') {
-      Object.values(warehouses).forEach(w => {
-        const items = w.items || w.inventory || w.products || w;
-        if (Array.isArray(items)) {
-          items.forEach(item => {
-            const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name);
-            if (name) productsSet.add(String(name).trim());
-          });
-        }
-      });
-    }
-  }
 
-  // 2. Estrae dall'inventario principale corrente (window.inventoryData)
-  if (window.inventoryData && Array.isArray(window.inventoryData)) {
-    window.inventoryData.forEach(item => {
-      const name = item.prodotto || item.product || item.name;
-      if (name) productsSet.add(String(name).trim());
-    });
-  }
+  // 1. Cerca in tutte le possibili variabili globali di inventario/magazzino
+  const globalSources = [
+    window.inventoryData,
+    window.masterInventory,
+    window.allProducts,
+    window.loadedData,
+    window.historicalData,
+    window.excelData,
+    window.dbData
+  ];
 
-  // 3. Controlla eventuali array storici o di importazione globale (file Historical)
-  ['historicalData', 'excelData', 'masterProducts', 'globalProductsList', 'loadedData', 'allProducts'].forEach(prop => {
-    if (window[prop] && Array.isArray(window[prop])) {
-      window[prop].forEach(item => {
-        const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name);
-        if (name) productsSet.add(String(name).trim());
+  globalSources.forEach(source => {
+    if (Array.isArray(source)) {
+      source.forEach(item => {
+        if (!item) return;
+        // Recupera il nome del prodotto indipendentemente dalla proprietà usata nell'oggetto
+        const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name || item.Nome);
+        if (name && typeof name === 'string' && name.trim() !== '') {
+          productsSet.add(name.trim());
+        }
       });
     }
   });
 
-  // 4. Recupera da funzioni globali se definite
-  if (typeof getAllProducts === 'function') {
-    try {
-      const prods = getAllProducts();
-      if (Array.isArray(prods)) {
-        prods.forEach(p => { 
-          const name = typeof p === 'string' ? p : (p.prodotto || p.product || p.name);
-          if (name) productsSet.add(String(name).trim()); 
+  // 2. Se l'app usa una struttura a magazzini multipli (es. warehouses o magazzini numerati)
+  if (typeof warehouses !== 'undefined' && warehouses) {
+    const wList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses);
+    wList.forEach(w => {
+      const items = w.items || w.inventory || w.products || w;
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          const name = typeof item === 'string' ? item : (item.prodotto || item.product || item.name || item.Nome);
+          if (name && typeof name === 'string' && name.trim() !== '') {
+            productsSet.add(name.trim());
+          }
         });
       }
-    } catch(e) { console.error(e); }
-  }
-
-  if (window.globalProductsList && Array.isArray(window.globalProductsList)) {
-    window.globalProductsList.forEach(p => { 
-      const name = typeof p === 'string' ? p : (p.prodotto || p.product || p.name);
-      if (name) productsSet.add(String(name).trim()); 
     });
   }
 
-  // Se trova prodotti, restituisce l'elenco completo unificato e ordinato alfabeticamente
+  // Se abbiamo trovato i prodotti, restituisci l'array completo ordinato alfabeticamente
   if (productsSet.size > 0) {
     return Array.from(productsSet).sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
   }
 
-  // 5. Fallback di sicurezza estrema se nessun dato è ancora inizializzato
+  // 3. Fallback estremo basato sui dati reali visibili nel tuo magazzino (estratto dalla seconda foto)
   return [
-    "Bounty", "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers", 
-    "Kinder Bueno", "Kinder Barrette", "KitKat", "Maltesers", "Haribo", "Patatine San Carlo", "Coca Cola", "Acqua"
+    "3D Glasses component", "Acqua frizzante 50 cl", "Acqua frizzante 75 cl", 
+    "Acqua Naturale", "Acqua naturale 50 cl", "Acqua Naturale 75 cl", 
+    "Arachidi", "B&J Caramel chechchew", "B&J Choc Fudge Brownie", "Bounty", 
+    "MM Peanuts 45gr", "MM Choco 45gr", "MM Crispy 36gr", "Twix", "Mars", "Snickers"
   ];
 }
 
