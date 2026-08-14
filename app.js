@@ -1009,17 +1009,6 @@ function addDistributorRow(dIdx) {
   }
 }
 
-function removeDistributorRow(dIdx, rIdx) {
-  const cfg = getActiveCinemaDistributorConfig();
-  if (cfg.distributors[dIdx] && cfg.distributors[dIdx].rows) {
-    cfg.distributors[dIdx].rows.splice(rIdx, 1);
-    saveDistributorConfig();
-    syncDistributorsToGlobalStock();
-    if (typeof recalcKPIs === 'function') recalcKPIs();
-    renderDistributorsView();
-  }
-}
-
 function syncDistributorsToGlobalStock() {
   const cfg = getActiveCinemaDistributorConfig();
   if (!cfg || !cfg.distributors) return;
@@ -1027,7 +1016,7 @@ function syncDistributorsToGlobalStock() {
   const totalsByProduct = {};
   cfg.distributors.forEach(d => {
     (d.rows || []).forEach(r => {
-      if (r.product && r.contaFinale !== "" && r.contaFinale !== null) {
+      if (r.product && r.contaFinale !== "" && r.contaFinale !== null && r.contaFinale !== undefined) {
         const val = parseFloat(r.contaFinale) || 0;
         const key = String(r.product).trim().toLowerCase();
         totalsByProduct[key] = (totalsByProduct[key] || 0) + val;
@@ -1035,6 +1024,23 @@ function syncDistributorsToGlobalStock() {
     });
   });
 
+  // Aggiorna l'array globale 'rows' (utilizzato dalla tabella principale)
+  if (typeof rows !== 'undefined' && Array.isArray(rows)) {
+    rows.forEach(item => {
+      const prodName = item.name || item.prodotto || item.product || item.Descrizione || item.Articolo;
+      if (prodName) {
+        const itemKey = String(prodName).trim().toLowerCase();
+        if (totalsByProduct[itemKey] !== undefined) {
+          const val = totalsByProduct[itemKey];
+          item.effettivo = val;
+          item.effettivoTotale = val;
+          item.effettivo_totale = val;
+        }
+      }
+    });
+  }
+
+  // Aggiorna anche window.inventoryData se presente
   if (window.inventoryData && Array.isArray(window.inventoryData)) {
     window.inventoryData.forEach(item => {
       const prodName = item.prodotto || item.product || item.name;
@@ -1058,6 +1064,8 @@ function syncDistributorsToGlobalStock() {
     renderInventoryTable();
   } else if (typeof renderTable === 'function') {
     renderTable();
+  } else if (typeof render === 'function') {
+    render();
   }
 }
 /* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
