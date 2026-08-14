@@ -1,7 +1,6 @@
 /* ==========================================================================
-   APP STOCK MAGAZZINO CINEMA - FILE COMPLETO APP.JS (FIXED)
+   APP STOCK MAGAZZINO CINEMA - FILE COMPLETO APP.JS (FIXED & ENHANCED)
    ========================================================================== */
-
 let mag = [], size = [], rows = [], postMixProducts = [];
 let cinemaName = "TSC Beinasco";
 let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
@@ -21,6 +20,7 @@ const DEFAULT_CINEMAS = [
 
 /* --- CONFIGURAZIONE DINAMICA BLOCCHI CARAMELLE --- */
 let candyGridConfigs = JSON.parse(localStorage.getItem("candy_grid_configs")) || {};
+
 function getActiveCinemaCandyConfig() {
   if (!candyGridConfigs[cinemaName]) {
     candyGridConfigs[cinemaName] = {
@@ -47,9 +47,11 @@ function getActiveCinemaCandyConfig() {
   if (!cfg.buste || !Array.isArray(cfg.buste)) cfg.buste = Array(10).fill().map(() => ({kg: 0, sleeve: 0}));
   return cfg;
 }
+
 function saveCandyConfig() {
   localStorage.setItem("candy_grid_configs", JSON.stringify(candyGridConfigs));
 }
+
 function getCandyTotalKg() {
   const cfg = getActiveCinemaCandyConfig();
   let total = 0;
@@ -70,7 +72,7 @@ function getCandyTotalKg() {
       }
     });
   }
- if (Array.isArray(cfg.buste)) {
+  if (Array.isArray(cfg.buste)) {
     cfg.buste.forEach(b => { total += n(b.kg) * n(b.sleeve); });
   }
   return total;
@@ -78,6 +80,7 @@ function getCandyTotalKg() {
 
 /* --- CONFIGURAZIONE DINAMICA POST MIX --- */
 let postMixGridConfigs = JSON.parse(localStorage.getItem("postmix_grid_configs")) || {};
+
 function getActiveCinemaPostMixConfig() {
   if (!postMixGridConfigs[cinemaName]) {
     postMixGridConfigs[cinemaName] = {
@@ -96,9 +99,11 @@ function getActiveCinemaPostMixConfig() {
   }
   return cfg;
 }
+
 function savePostMixConfig() {
   localStorage.setItem("postmix_grid_configs", JSON.stringify(postMixGridConfigs));
 }
+
 function getPostMixProductTotals() {
   const cfg = getActiveCinemaPostMixConfig();
   let totals = {}; 
@@ -126,6 +131,7 @@ function getPostMixProductTotals() {
 
 /* --- CONFIGURAZIONE DISTRIBUTORI --- */
 let distributorGridConfigs = JSON.parse(localStorage.getItem("distributor_grid_configs")) || {};
+
 function getActiveCinemaDistributorConfig() {
   if (!distributorGridConfigs[cinemaName]) {
     distributorGridConfigs[cinemaName] = {
@@ -143,9 +149,11 @@ function getActiveCinemaDistributorConfig() {
   }
   return cfg;
 }
+
 function saveDistributorConfig() {
   localStorage.setItem("distributor_grid_configs", JSON.stringify(distributorGridConfigs));
 }
+
 function getDistributorsContaFinaleTotals() {
   const cfg = getActiveCinemaDistributorConfig();
   let totals = {};
@@ -165,15 +173,14 @@ function getDistributorsContaFinaleTotals() {
 }
 
 const $ = id => document.getElementById(id);
+
 document.addEventListener("DOMContentLoaded", () => {
   loadSetupFromStorage();
   loadCountsFromStorage();
   updateHeaderTitle();
   injectExcelTemplateButton();
-
   const bottomExportBtns = document.querySelectorAll("button[onclick*='export'], .btn-export");
   bottomExportBtns.forEach(btn => btn.remove());
-
   if ($("magFile")) {
     $("magFile").addEventListener("change", e => {
       const f = e.target.files[0];
@@ -211,22 +218,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE, POST MIX, DISTRIBUTORI) --- */
+/* --- RENDER DELLE SCHEDE SPECIALI (CARAMELLE) --- */
 function renderCandyView() {
   const container = $("tbody");
   const thead = $("thead");
   if (!container || !thead) return;
-
   const cfg = getActiveCinemaCandyConfig();
-
-  // Imposta "vertical" di DEFAULT se non è stato ancora salvato nulla
   if (!cfg.orientation) cfg.orientation = 'vertical';
-
+  
   thead.innerHTML = `<tr><th colspan="10" style="background:#d35400; color:white; font-size:1.1rem; padding:10px;">🍬 Gestione Inserimento Caramelle (${esc(cinemaName)})</th></tr>`;
   
   let html = `<tr><td colspan="10" style="padding:20px; background:#fff3e0;">`;
   
-  // Sezione Superiore: Totale, 4 Caselle Tare, Menù a tendina Blocco e Orientamento
   const totalKg = typeof getCandyTotalKg === 'function' ? getCandyTotalKg() : 0;
   html += `
     <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
@@ -234,7 +237,7 @@ function renderCandyView() {
         <h3 style="color:#d35400; margin:0;">Totale Netto Caramelle: <span id="candyTotalKgDisplay">${totalKg.toFixed(2)} Kg</span></h3>
       </div>
       
-      <!-- 4 Caselle di testo per le tare -->
+      <!-- Tare -->
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <span style="font-size:0.85rem; font-weight:bold; color:#d35400;">Tare (Kg):</span>
         ${[0,1,2,3].map(i => `
@@ -247,7 +250,7 @@ function renderCandyView() {
         `).join('')}
       </div>
 
-      <!-- Menù a tendina numero blocchi e orientamento -->
+      <!-- Menù Blocchi e Orientamento -->
       <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap; border-top:1px solid #eee; padding-top:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <label style="font-size:0.85rem; font-weight:bold; color:#666;">Numero Blocchi:</label>
@@ -257,16 +260,16 @@ function renderCandyView() {
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <label style="font-size:0.85rem; font-weight:bold; color:#666;">Orientamento Griglia:</label>
-          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;" onchange="updateCandyOrientation(this.value)">
-            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>Verticale</option>
-            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>Orizzontale</option>
+          <select style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px; background:#fff8f0; font-weight:bold; color:#d35400;" onchange="updateCandyOrientation(this.value)">
+            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>⬇️ Verticale (per Colonna)</option>
+            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>➡️ Orizzontale (per Riga)</option>
           </select>
         </div>
       </div>
     </div>
   `;
 
-  // Render dei Blocchi con menù a tendina per Righe e Colonne
+  // Render Blocchi
   cfg.blocks.forEach((b, bIdx) => {
     html += `<div style="margin-top:15px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
               <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
@@ -287,32 +290,40 @@ function renderCandyView() {
                 </div>
               </div>`;
 
-    // Costruzione DINAMICA della griglia CSS (Gestisce sia Verticale che Orizzontale)
     let gridStyle = '';
     let cellOrder = [];
 
     if (cfg.orientation === 'horizontal') {
       gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 5px;`;
       for (let r = 0; r < b.rows; r++) {
-        for (let c = 0; c < b.columns; c++) cellOrder.push({ r, c });
+        for (let c = 0; c < b.columns; c++) {
+          let num = (r * b.columns) + c + 1;
+          cellOrder.push({ r, c, num });
+        }
       }
     } else {
-      // Disposizione VERTICALE (ordinata per colonna dall'alto verso il basso)
-      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(110px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 5px;`;
+      // VERTICALE: evidenziata con bordo e numerazione dall'alto verso il basso
+      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(115px, 1fr); gap: 8px; margin-top: 8px; overflow-x: auto; padding: 10px; background: #fffdfa; border: 2px dashed #e67e22; border-radius: 6px;`;
       for (let c = 0; c < b.columns; c++) {
-        for (let r = 0; r < b.rows; r++) cellOrder.push({ r, c });
+        for (let r = 0; r < b.rows; r++) {
+          let num = (c * b.rows) + r + 1;
+          cellOrder.push({ r, c, num });
+        }
       }
     }
 
     html += `<div style="${gridStyle}">`;
-
-    cellOrder.forEach(({ r, c }) => {
+    cellOrder.forEach(({ r, c, num }) => {
       let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
       let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+      let badgeBg = cfg.orientation === 'vertical' ? '#e67e22' : '#7f8c8d';
 
       html += `
-        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
-          <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:white; border-radius:6px; display:flex; flex-direction:column; gap:4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.75rem; font-weight:bold; background:${badgeBg}; color:white; padding:1px 5px; border-radius:3px;">N° ${num}</span>
+            <span style="font-size:0.65rem; color:#888;">R${r+1}-C${c+1}</span>
+          </div>
           <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
             ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
           </select>
@@ -320,11 +331,10 @@ function renderCandyView() {
             oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
         </div>`;
     });
-
     html += `</div></div>`;
   });
 
-  // Sezione Buste e Scorte Sfuse
+  // Buste e Scorte Sfuse
   if (cfg.buste) {
     html += `
       <div style="margin-top:25px; background:white; padding:15px; border-radius:8px; border:1px solid #ffe0b2;">
@@ -332,7 +342,6 @@ function renderCandyView() {
         <p style="font-size:0.85rem; color:#666; margin-bottom:12px;">Inserisci i Kg lordi e il numero di sleeve per ciascuna busta.</p>
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:10px;">
     `;
-
     cfg.buste.forEach((busta, bIdx) => {
       html += `
         <div style="border:1px solid #ddd; padding:10px; border-radius:6px; background:#fafafa; display:flex; flex-direction:column; gap:6px;">
@@ -350,10 +359,8 @@ function renderCandyView() {
         </div>
       `;
     });
-
     html += `</div></div>`;
   }
-
   html += `</td></tr>`;
   container.innerHTML = html;
 }
@@ -381,6 +388,7 @@ function updateCandyBlocksCount(countVal) {
 
 function updateCandyOrientation(orient) {
   const cfg = getActiveCinemaCandyConfig();
+  if (!cfg) return;
   cfg.orientation = orient;
   saveCandyConfig();
   renderCandyView();
@@ -444,17 +452,15 @@ function updateCandyTotalUI() {
   recalcKPIs();
 }
 
+/* --- RENDER POST MIX --- */
 function renderPostMixView() {
   const container = $("tbody");
   const thead = $("thead");
   if (!container || !thead) return;
-
   const cfg = getActiveCinemaPostMixConfig();
   thead.innerHTML = `<tr><th colspan="10" style="background:#2980b9; color:white; font-size:1.1rem; padding:10px;">🥤 Post Mix e Sciroppi (${esc(cinemaName)})</th></tr>`;
-
   let html = `<tr><td colspan="10" style="padding:15px; background:#eaf2f8;">`;
   
-  // Riepilogo Totali Sciroppi
   const totals = getPostMixProductTotals();
   html += `<h4>Totali Rilevati Sciroppi:</h4><ul style="margin-bottom:15px; font-size:0.9rem;">`;
   const productKeys = Object.keys(totals);
@@ -467,16 +473,12 @@ function renderPostMixView() {
   }
   html += `</ul>`;
 
-  // Griglia dei Blocchi
   html += `<div style="display:flex; gap:15px; overflow-x:auto; padding-bottom:10px; width:100%;">`;
-
   cfg.blocks.forEach((b, bIdx) => {
     html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1; min-width:320px; flex:1;">`;
     html += `<h5 style="color:#2980b9; margin-bottom:10px;">${esc(b.name)}</h5>`;
-
     let gridStyle = '';
     let cellOrder = [];
-
     if (cfg.orientation === 'horizontal') {
       gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(130px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
       for (let r = 0; r < b.rows; r++) {
@@ -488,12 +490,9 @@ function renderPostMixView() {
         for (let r = 0; r < b.rows; r++) cellOrder.push({ r, c });
       }
     }
-
     html += `<div style="${gridStyle}">`;
-
     cellOrder.forEach(({ r, c }) => {
       let cell = b.gridValues?.[r]?.[c] || { prodName: "", weight: "" };
-
       html += `
         <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:125px;">
           <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
@@ -507,13 +506,12 @@ function renderPostMixView() {
                  oninput="updatePostMixCell(${bIdx}, ${r}, ${c}, null, this.value)">
         </div>`;
     });
-
     html += `</div></div>`;
   });
-
   html += `</div></td></tr>`;
   container.innerHTML = html;
 }
+
 function updatePostMixCell(bIdx, r, c, prodName, weight) {
   const cfg = getActiveCinemaPostMixConfig();
   if (!cfg.blocks[bIdx].gridValues) cfg.blocks[bIdx].gridValues = {};
@@ -527,13 +525,6 @@ function updatePostMixCell(bIdx, r, c, prodName, weight) {
   savePostMixConfig();
   recalcKPIs();
 }
-function updateCandyOrientation(val) {
-  const cfg = getActiveCinemaCandyConfig();
-  if (!cfg) return;
-  cfg.orientation = val;
-  if (typeof saveCandyConfig === "function") saveCandyConfig();
-  renderCandyView();
-}
 
 function updatePostMixOrientation(val) {
   const cfg = getActiveCinemaPostMixConfig();
@@ -542,14 +533,14 @@ function updatePostMixOrientation(val) {
   savePostMixConfig();
   renderPostMixView();
 }
+
+/* --- RENDER DISTRIBUTORI --- */
 function renderDistributorsView() {
   const container = $("tbody");
   const thead = $("thead");
   if (!container || !thead) return;
-
   const cfg = getActiveCinemaDistributorConfig();
   thead.innerHTML = `<tr><th colspan="10" style="background:#8e44ad; color:white; font-size:1.1rem; padding:10px;">🍫 Distributori Automatici (${esc(cinemaName)})</th></tr>`;
-
   let html = `<tr><td colspan="10" style="padding:15px; background:#f5eef8;">`;
   cfg.distributors.forEach((d, dIdx) => {
     html += `<div style="background:white; padding:12px; margin-bottom:15px; border-radius:6px; border:1px solid #d2b4de;">
@@ -572,7 +563,6 @@ function renderDistributorsView() {
     });
     html += `</tbody></table></div>`;
   });
-
   html += `</td></tr>`;
   container.innerHTML = html;
 }
@@ -586,33 +576,28 @@ function updateDistRow(dIdx, rIdx, key, val) {
   }
 }
 
-/* --- BARRA PULSANTI UNIFICATA IN ALTO --- */
+/* --- PULSANTI EXCEL ED ESPORTAZIONE --- */
 function injectExcelTemplateButton() {
   const headerContainer = document.querySelector("header") || document.querySelector(".header") || document.body;
   if ($("exportTemplateBtnContainer")) return;
-
   const btnContainer = document.createElement("div");
   btnContainer.id = "exportTemplateBtnContainer";
   btnContainer.className = "no-print";
   btnContainer.style.cssText = "display: flex; gap: 12px; margin: 10px 0; align-items: center; flex-wrap: wrap;";
-
   const exportTemplateBtn = document.createElement("button");
   exportTemplateBtn.id = "btnExportExcelTemplate";
   exportTemplateBtn.className = "btn btn-secondary";
   exportTemplateBtn.innerHTML = "📋 Esporta Excel (Template Vuoto)";
   exportTemplateBtn.style.cssText = "background: #005a9e; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportTemplateBtn.onclick = () => handleDynamicExport(true);
-
   const exportCountsBtn = document.createElement("button");
   exportCountsBtn.id = "btnExportExcelCounts";
   exportCountsBtn.className = "btn btn-success";
   exportCountsBtn.innerHTML = "📊 Esporta Report (Conteggi Rilevati)";
   exportCountsBtn.style.cssText = "background: #27ae60; color: white; border: none; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.15);";
   exportCountsBtn.onclick = () => handleDynamicExport(false);
-
   btnContainer.appendChild(exportTemplateBtn);
   btnContainer.appendChild(exportCountsBtn);
-
   const titleEl = $("appTitle") || headerContainer;
   if (titleEl && titleEl.parentNode) {
     titleEl.parentNode.insertBefore(btnContainer, titleEl.nextSibling);
@@ -658,7 +643,6 @@ function exportCandyGridExcel(isEmpty) {
         <tr><td colspan="15" class="title-row">SCHEDA CARAMELLE — ${esc(cinemaName)} ${isEmpty ? '(TEMPLATE VUOTO)' : '(CONTEGGI)'}</td></tr>
       </table>
   `;
-
   cfg.blocks.forEach(b => {
     html += `<table><tr><td colspan="${b.columns}" class="block-title">${esc(b.name)}</td></tr>`;
     for (let r = 0; r < b.rows; r++) {
@@ -678,7 +662,6 @@ function exportCandyGridExcel(isEmpty) {
     }
     html += `</table><br/>`;
   });
-
   html += `
     <table>
       <tr><td colspan="4" class="block-title">📦 BUSTE E SCORTE SFUSE</td></tr>
@@ -691,7 +674,6 @@ function exportCandyGridExcel(isEmpty) {
     html += `<tr><td>Busta ${idx + 1}</td><td>${kg}</td><td>${sl}</td><td>${tot}</td></tr>`;
   });
   html += `</table></body></html>`;
-
   downloadExcelBlob(html, `Caramelle_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
 
@@ -715,7 +697,6 @@ function exportPostMixGridExcel(isEmpty) {
         <tr><td colspan="10" class="title-row">SCHEDA POST MIX — ${esc(cinemaName)} ${isEmpty ? '(TEMPLATE VUOTO)' : '(CONTEGGI)'}</td></tr>
       </table>
   `;
-
   cfg.blocks.forEach(b => {
     html += `<table><tr><td colspan="${b.columns}" class="block-title">${esc(b.name)}</td></tr>`;
     for (let r = 0; r < b.rows; r++) {
@@ -733,7 +714,6 @@ function exportPostMixGridExcel(isEmpty) {
     html += `</table><br/>`;
   });
   html += `</body></html>`;
-
   downloadExcelBlob(html, `PostMix_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
 
@@ -757,7 +737,6 @@ function exportDistributorsExcel(isEmpty) {
         <tr><td colspan="10" class="title-row">SCHEDA DISTRIBUTORI AUTOMATICI — ${esc(cinemaName)} ${isEmpty ? '(TEMPLATE VUOTO)' : '(CONTEGGI)'}</td></tr>
       </table>
   `;
-
   cfg.distributors.forEach(d => {
     html += `
       <table>
@@ -781,7 +760,6 @@ function exportDistributorsExcel(isEmpty) {
     });
     html += `</table><br/>`;
   });
-
   html += `</body></html>`;
   downloadExcelBlob(html, `Distributori_${cinemaName}_${isEmpty ? 'Template' : 'Report'}.xls`);
 }
@@ -803,26 +781,22 @@ function exportCurrentInventoryToExcel() {
     alert("Nessun dato prodotto caricato da esportare!");
     return;
   }
-
   let activeMagName = cinemaName;
   if (currentTab === 'tot') {
     activeMagName = `${cinemaName} - RIEPILOGO TOTALE`;
   } else if (typeof currentTab === 'number' && warehouses[currentTab]) {
     activeMagName = `${cinemaName} - ${warehouses[currentTab]}`;
   }
-
   let totalItems = rows.length;
   let totalAtteso = 0;
   let totalRilevato = 0;
   let totalDiffValore = 0;
-
   rows.forEach(r => {
     totalAtteso += (r.atteso || 0);
     const eff = getGlobalRilevato(r.code, r);
     totalRilevato += eff;
     totalDiffValore += (eff - (r.atteso || 0)) * (r.standardCost || 0);
   });
-
   let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -885,7 +859,6 @@ function exportCurrentInventoryToExcel() {
           <th>Diff. Valore</th>
         </tr>
   `;
-
   rows.forEach((r, idx) => {
     let totBoxLocal = 0, totSleeveLocal = 0, totSfusoLocal = 0;
     if (currentTab === 'tot') {
@@ -901,15 +874,12 @@ function exportCurrentInventoryToExcel() {
       totSleeveLocal = sumArr(c.sleeve);
       totSfusoLocal = sumArr(c.sfuso);
     }
-
     const baseRilevato = (totBoxLocal * (r.boxSize || 0)) + (totSleeveLocal * (r.sleeveSize || 0)) + totSfusoLocal;
     const kitPart = getKitContributionDetail(r.name, r.code);
     const effettivoTotaleComplesso = getGlobalRilevato(r.code, r);
     const diffTotale = effettivoTotaleComplesso - (r.atteso || 0);
     const diffValore = diffTotale * (r.standardCost || 0);
-
     const rowClass = idx % 2 === 0 ? 'row-even' : 'row-odd';
-
     html += `
       <tr class="${rowClass}">
         <td class="text-left num-bold">${esc(r.name)}</td>
@@ -932,7 +902,6 @@ function exportCurrentInventoryToExcel() {
       </tr>
     `;
   });
-
   html += `</table></body></html>`;
   downloadExcelBlob(html, `Report_Inventario_${activeMagName.replace(/[^a-zA-Z0-9-_]/g, "_")}.xls`);
 }
@@ -942,14 +911,12 @@ function exportEmptyTemplateToExcel() {
     alert("Nessun prodotto caricato!");
     return;
   }
-
   let activeMagName = cinemaName;
   if (typeof currentTab === 'number' && warehouses[currentTab]) {
     activeMagName = `${cinemaName} - ${warehouses[currentTab]}`;
   } else {
     activeMagName = `${cinemaName} - Template Conteggio`;
   }
-
   let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -984,12 +951,10 @@ function exportEmptyTemplateToExcel() {
           <th>Valore Atteso</th>
         </tr>
   `;
-
   rows.forEach((r, idx) => {
     const rowClass = idx % 2 === 0 ? 'row-even' : 'row-odd';
     const hasBox = r.boxSize > 0;
     const hasSleeve = r.sleeveSize > 0;
-
     html += `
       <tr class="${rowClass}">
         <td class="text-left" style="font-weight:bold;">${esc(r.name)}</td>
@@ -1003,7 +968,6 @@ function exportEmptyTemplateToExcel() {
       </tr>
     `;
   });
-
   html += `</table></body></html>`;
   downloadExcelBlob(html, `Template_Conteggio_${activeMagName.replace(/[^a-zA-Z0-9-_]/g, "_")}.xls`);
 }
@@ -1012,23 +976,29 @@ function toggleFilesSection() {
   const sec = $("filesSection");
   if (sec) sec.style.display = (sec.style.display === "none") ? "grid" : "none";
 }
+
 function updateHeaderTitle() {
   if ($("appTitle")) $("appTitle").textContent = `📊 Gestione Inventario — ${cinemaName}`;
 }
+
 function showError(msg) { alert(msg); }
+
 function loadSetupFromStorage() {
   const savedCinema = localStorage.getItem("cinema_info_name");
   if (savedCinema) cinemaName = savedCinema;
   const savedWh = localStorage.getItem("cinema_warehouses");
   if (savedWh) { try { warehouses = JSON.parse(savedWh); } catch(e){} }
 }
+
 function loadCountsFromStorage() {
   const savedCounts = localStorage.getItem("inventory_counts");
   if (savedCounts) { try { countsData = JSON.parse(savedCounts); } catch(e){} }
 }
+
 function saveCountsToStorage() {
   localStorage.setItem("inventory_counts", JSON.stringify(countsData));
 }
+
 function resetCounts() {
   if (confirm("Sei sicuro di voler azzerare tutti i conteggi inseriti per tutti i magazzini?")) {
     countsData = {};
@@ -1036,10 +1006,12 @@ function resetCounts() {
     render();
   }
 }
+
 function handleCinemaSelectChange() {
   const sel = $("cinemaSelect").value;
   if ($("customCinemaDiv")) $("customCinemaDiv").style.display = (sel === "__CUSTOM__") ? "block" : "none";
 }
+
 function saveWarehousesSetup() {
   const sel = $("cinemaSelect").value;
   if (sel === "__CUSTOM__") {
@@ -1065,6 +1037,7 @@ function saveWarehousesSetup() {
   currentTab = 0;
   switchTab();
 }
+
 function renderSetupView() {
   if ($("tabContent")) $("tabContent").style.display = "none";
   if ($("setupView")) $("setupView").style.display = "block";
@@ -1108,6 +1081,7 @@ function renderSetupView() {
     });
   }
 }
+
 function addWarehouseInput() {
   const container = $("whList");
   if (!container) return;
@@ -1120,19 +1094,18 @@ function addWarehouseInput() {
   `;
   container.appendChild(div);
 }
+
 function renderTabs() {
   const bar = $("tabsBar");
   if (!bar) return;
   bar.innerHTML = "";
-
-  // 1. Tasto Impostazioni / Setup
+  
   const setupBtn = document.createElement("button");
   setupBtn.className = `tab-btn ${currentTab === 'setup' ? 'active' : ''}`;
   setupBtn.innerHTML = `⚙️ Impostazioni`;
   setupBtn.onclick = () => { currentTab = 'setup'; switchTab(); };
   bar.appendChild(setupBtn);
-
-  // 2. Tab Magazzini
+  
   warehouses.forEach((w, idx) => {
     const btn = document.createElement("button");
     btn.className = `tab-btn ${currentTab === idx ? 'active' : ''}`;
@@ -1140,34 +1113,30 @@ function renderTabs() {
     btn.onclick = () => { currentTab = idx; switchTab(); };
     bar.appendChild(btn);
   });
-
-  // 3. Tab Caramelle
+  
   const candyBtn = document.createElement("button");
   candyBtn.className = `tab-btn ${currentTab === 'candy' ? 'active' : ''}`;
   candyBtn.innerHTML = `🍬 Caramelle`;
   candyBtn.onclick = () => { currentTab = 'candy'; switchTab(); };
   bar.appendChild(candyBtn);
-
-  // 4. Tab Post Mix
+  
   const postMixBtn = document.createElement("button");
   postMixBtn.className = `tab-btn ${currentTab === 'postmix' ? 'active' : ''}`;
   postMixBtn.innerHTML = `🥤 Post Mix`;
   postMixBtn.onclick = () => { currentTab = 'postmix'; switchTab(); };
   bar.appendChild(postMixBtn);
-
-  // 5. Tab Distributori
+  
   const distBtn = document.createElement("button");
   distBtn.className = `tab-btn ${currentTab === 'distributors' ? 'active' : ''}`;
   distBtn.innerHTML = `🍫 Distributori`;
   distBtn.onclick = () => { currentTab = 'distributors'; switchTab(); };
   bar.appendChild(distBtn);
-
-  // 6. Tab Riepilogo Totale
+  
   const summaryBtn = document.createElement("button");
   summaryBtn.className = `tab-btn ${currentTab === 'summary' ? 'active' : ''}`;
   summaryBtn.innerHTML = `📊 RIEPILOGO TOTALE`;
   summaryBtn.onclick = () => { currentTab = 'summary'; switchTab(); };
-bar.appendChild(summaryBtn);
+  bar.appendChild(summaryBtn);
 }
 
 function switchTab() {
@@ -1180,6 +1149,7 @@ function switchTab() {
     render();
   }
 }
+
 function readMatrix(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -1200,13 +1170,16 @@ function readMatrix(file) {
     r.readAsArrayBuffer(file);
   });
 }
+
 function text(v) { return String(v ?? "").trim(); }
+
 function cleanCode(val) {
   if (val === null || val === undefined) return "";
   let s = text(val);
   if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
   return s;
 }
+
 function n(v) {
   if (typeof v === "number") return v;
   let s = text(v).replace(/\s/g, "").replace(/€/g, "");
@@ -1216,10 +1189,12 @@ function n(v) {
   const x = parseFloat(s.replace(/[^\d.-]/g, ""));
   return Number.isFinite(x) ? x : 0;
 }
+
 function norm(v) { return text(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toUpperCase(); }
 function esc(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function fmt(val) { return Number(val || 0).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 function fmtMoney(val) { return Number(val || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
 function parseMag(m) {
   const out = [];
   for (let i = 0; i < m.length; i++) {
@@ -1243,6 +1218,7 @@ function parseMag(m) {
   if (out.length === 0) throw new Error("Nessun prodotto trovato nel report Magazzino.");
   return out;
 }
+
 function parseSize(m) {
   const sizeOut = [];
   const postMixOut = [];
@@ -1319,6 +1295,7 @@ function parseSize(m) {
   }
   return { size: sizeOut, postMix: postMixOut };
 }
+
 function build() {
   if (!mag.length || !size.length) {
     if ($("mainStatus")) {
@@ -1368,6 +1345,7 @@ function build() {
   renderTabs();
   render();
 }
+
 function getCount(whIdx, code) {
   if (!countsData[whIdx]) countsData[whIdx] = {};
   if (!countsData[whIdx][code]) countsData[whIdx][code] = { box: [0], sleeve: [0], sfuso: [0] };
@@ -1377,7 +1355,9 @@ function getCount(whIdx, code) {
   if (!Array.isArray(c.sfuso)) c.sfuso = [n(c.sfuso)];
   return c;
 }
+
 function sumArr(arr) { if (!Array.isArray(arr)) return 0; return arr.reduce((a, b) => a + n(b), 0); }
+
 function getKitContributionDetail(productName, productCode) {
   let kitContribution = 0;
   const cleanStr = (str) => norm(str).replace(/[^A-Z0-9]/g, "");
@@ -1405,6 +1385,7 @@ function getKitContributionDetail(productName, productCode) {
   });
   return kitContribution;
 }
+
 function getGlobalRilevato(code, r) {
   let totBox = 0, totSleeve = 0, totSfuso = 0;
   warehouses.forEach((_, idx) => {
@@ -1442,6 +1423,7 @@ function getGlobalRilevato(code, r) {
   }
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
+
 function render() {
   if (currentTab === 'setup') return;
   if (currentTab === 'candy') { renderCandyView(); return; }
@@ -1536,6 +1518,7 @@ function render() {
   }
   recalcKPIs();
 }
+
 function renderMultiInput(whIdx, code, fieldType, unitSize) {
   const c = getCount(whIdx, code);
   const arr = c[fieldType] || [0];
@@ -1555,6 +1538,7 @@ function renderMultiInput(whIdx, code, fieldType, unitSize) {
     <button onclick="addCountField(${whIdx}, '${code}', '${fieldType}')" style="padding: 2px 6px; font-size: 0.75rem; cursor:pointer;" title="Aggiungi campo" class="no-print">+</button>
   `;
 }
+
 function updateCountField(whIdx, code, fieldType, idx, val) {
   const c = getCount(whIdx, code);
   c[fieldType][idx] = n(val);
@@ -1582,12 +1566,14 @@ function updateCountField(whIdx, code, fieldType, idx, val) {
   }
   recalcKPIs();
 }
+
 function addCountField(whIdx, code, fieldType) {
   const c = getCount(whIdx, code);
   c[fieldType].push(0);
   saveCountsToStorage();
   render();
 }
+
 function recalcKPIs() {
   let totAtteso = 0, totRilevato = 0, totDiffValore = 0;
   rows.forEach(r => {
