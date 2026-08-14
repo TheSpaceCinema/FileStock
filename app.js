@@ -438,40 +438,38 @@ function renderPostMixView() {
     html += `<div style="background:white; padding:10px; border-radius:6px; border:1px solid #aed6f1;">
               <h5 style="color:#2980b9;">${esc(b.name)}</h5>
               <div style="display:grid; grid-template-columns: repeat(${Math.min(b.columns, 6)}, 1fr); gap:6px; margin-top:8px; overflow-x:auto;">`;
-let innerCellsHTML = '';
-    
-    // Funzione interna per generare la singola cella
-    const renderCell = (r, c) => {
-      let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
-      let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
-      return `
-        <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px;">
-          <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
-          <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
-            ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
-          </select>
-          <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
-            oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
-        </div>`;
-    };
-
+// 1. Definiamo lo stile del contenitore in base all'orientamento scelto
+    let gridStyle = '';
     if (cfg.orientation === 'horizontal') {
-      // Prima tutte le colonne di una riga, poi la riga successiva
-      for(let r=0; r<b.rows; r++) {
-        for(let c=0; c<b.columns; c++) {
-          innerCellsHTML += renderCell(r, c);
-        }
-      }
+      // ORIZZONTALE: Forza tutte le colonne su un'unica riga con scroll orizzontale
+      gridStyle = `display: grid; grid-template-columns: repeat(${b.columns}, minmax(85px, 1fr)); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
     } else {
-      // Prima tutte le righe di una colonna, poi la colonna successiva (Verticale)
-      for(let c=0; c<b.columns; c++) {
-        for(let r=0; r<b.rows; r++) {
-          innerCellsHTML += renderCell(r, c);
-        }
+      // VERTICALE: Dispone le celle dall'alto verso il basso per colonna
+      gridStyle = `display: grid; grid-template-rows: repeat(${b.rows}, auto); grid-auto-flow: column; grid-auto-columns: minmax(85px, 1fr); gap: 6px; overflow-x: auto; width: 100%; padding-bottom: 8px;`;
+    }
+
+    // 2. Apriamo il div contenitore della griglia con lo stile dinamico
+    html += `<div style="${gridStyle}">`;
+
+    // 3. Generiamo direttamente le celle
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.columns; c++) {
+        let cell = b.gridValues?.[r]?.[c] || { weight: "", taraIdx: 0 };
+        let selectedTaraIdx = cell.taraIdx !== undefined ? cell.taraIdx : 0;
+
+        html += `
+          <div style="border:1px solid #ddd; padding:6px; text-align:center; background:#fafafa; border-radius:6px; display:flex; flex-direction:column; gap:4px; min-width:85px;">
+            <span style="font-size:0.7rem; color:#888; font-weight:bold;">R${r+1}-C${c+1}</span>
+            <select style="font-size:0.75rem; padding:2px; border:1px solid #ccc; border-radius:3px; background:white;" onchange="updateCandyCellTara(${bIdx}, ${r}, ${c}, this.value)">
+              ${cfg.tares.map((tVal, tIdx) => `<option value="${tIdx}" ${selectedTaraIdx === tIdx ? 'selected' : ''}>Tara: ${tVal}kg</option>`).join('')}
+            </select>
+            <input type="number" step="any" placeholder="Kg" value="${cell.weight || ''}" style="width:100%; font-size:0.85rem; text-align:center; padding:3px; border:1px solid #bbb; border-radius:4px;" 
+              oninput="updateCandyCellWeight(${bIdx}, ${r}, ${c}, this.value)">
+          </div>`;
       }
     }
-    
-    html += innerCellsHTML;
+
+    // 4. Chiudiamo i div contenitori
     html += `</div></div>`;
   });
 
