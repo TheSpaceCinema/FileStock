@@ -5,6 +5,7 @@ let mag = [], size = [], rows = [], postMixProducts = [];
 let cinemaName = "TSC Beinasco";
 let warehouses = ["Bar Principale", "Deposito Centrale", "Stand Popcorn"]; 
 let currentTab = 0; 
+let productSortDirection = "az";
 let countsData = {}; 
 const MAX_FIELDS = 10;
 const DEFAULT_CINEMAS = [
