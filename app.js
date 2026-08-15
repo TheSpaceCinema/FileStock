@@ -2241,7 +2241,50 @@ sfusoHtml = buildCellInputs('sfuso', c.sfuso);
 
     html += `
       <tr id="row-${r.code}">
-        <td><b>${esc(r.name)}</b><br><small style="color:#666">${esc(r.code)}</small></td>
+     <td>
+
+<div style="
+display:flex;
+gap:2px;
+margin-bottom:4px;
+">
+
+<button
+type="button"
+onclick="moveProduct('${r.code}',-1)"
+title="Sposta su"
+style="padding:0 4px;font-size:10px;"
+>
+⬆
+</button>
+
+<button
+type="button"
+onclick="moveProduct('${r.code}',1)"
+title="Sposta giù"
+style="padding:0 4px;font-size:10px;"
+>
+⬇
+</button>
+
+<button
+type="button"
+onclick="toggleProductVisibility('${r.code}')"
+title="Nascondi prodotto"
+style="padding:0 4px;font-size:10px;"
+>
+👁
+</button>
+
+</div>
+
+<b>${esc(r.name)}</b>
+<br>
+<small style="color:#666">
+${esc(r.code)}
+</small>
+
+</td>
         <td>${esc(r.uom)}</td>
         <td>${fmt(r.iniziale)}</td>
         <td>${fmt(r.danni)}</td>
