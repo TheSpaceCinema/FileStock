@@ -1970,17 +1970,164 @@ for (let [dName, dVal] of Object.entries(distTotals)) {
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
 
+let inventoryViewConfigs =
+JSON.parse(localStorage.getItem("inventory_view_configs")) || {};
+
+function getInventoryViewConfig() {
+
+  if (!inventoryViewConfigs[cinemaName]) {
+
+    inventoryViewConfigs[cinemaName] = {
+      hiddenProducts: [],
+      customOrder: [],
+      sortMode: "custom"
+    };
+
+  }
+
+  return inventoryViewConfigs[cinemaName];
+}
+
+function saveInventoryViewConfig() {
+
+  localStorage.setItem(
+    "inventory_view_configs",
+    JSON.stringify(inventoryViewConfigs)
+  );
+
+}
+
+function toggleProductVisibility(code) {
+
+  const cfg = getInventoryViewConfig();
+
+  const idx = cfg.hiddenProducts.indexOf(code);
+
+  if (idx >= 0)
+    cfg.hiddenProducts.splice(idx, 1);
+  else
+    cfg.hiddenProducts.push(code);
+
+  saveInventoryViewConfig();
+  render();
+
+}
+
+function moveProduct(code, direction) {
+
+  const cfg = getInventoryViewConfig();
+
+  rows.forEach(r => {
+    if (!cfg.customOrder.includes(r.code))
+      cfg.customOrder.push(r.code);
+  });
+
+  let pos = cfg.customOrder.indexOf(code);
+
+  if (pos < 0) return;
+
+  let newPos = pos + direction;
+
+  if (newPos < 0 || newPos >= cfg.customOrder.length)
+    return;
+
+  [
+    cfg.customOrder[pos],
+    cfg.customOrder[newPos]
+  ] =
+  [
+    cfg.customOrder[newPos],
+    cfg.customOrder[pos]
+  ];
+
+  saveInventoryViewConfig();
+  render();
+
+}
+
+function toggleProductSort() {
+
+  const cfg = getInventoryViewConfig();
+
+  if (cfg.sortMode === "custom")
+    cfg.sortMode = "az";
+  else if (cfg.sortMode === "az")
+    cfg.sortMode = "za";
+  else
+    cfg.sortMode = "custom";
+
+  saveInventoryViewConfig();
+  render();
+
+}
+
+function openProductsManager() {
+
+  alert(
+`Gestione Elenco
+
+✅ Riordino con frecce ↑↓
+
+✅ Nascondi prodotti
+
+✅ Ordinamento A-Z / Z-A cliccando PRODOTTO`
+  );
+
+}
+
 function render() {
   if (currentTab === 'setup') return;
   if (currentTab === 'candy') { renderCandyView(); return; }
   if (currentTab === 'postmix') { renderPostMixView(); return; }
   if (currentTab === 'distributors') { renderDistributorsView(); return; }
   
-  const q = $("search") ? norm($("search").value) : "";
-  const data = rows.filter(x => norm(x.name).includes(q) || norm(x.code).includes(q));
-  if ($("count")) $("count").textContent = `${data.length} prodotti`;
-  const isTotTab = (currentTab === 'summary' || currentTab === 'summary');
-  
+ const q = $("search") ? norm($("search").value) : "";
+
+const cfg = getInventoryViewConfig();
+
+let data = rows.filter(
+  x => norm(x.name).includes(q) ||
+       norm(x.code).includes(q)
+);
+
+data = data.filter(
+  p => !cfg.hiddenProducts.includes(p.code)
+);
+
+
+if (cfg.sortMode === "az") {
+
+  data.sort((a,b)=>
+    a.name.localeCompare(b.name)
+  );
+
+}
+else if (cfg.sortMode === "za") {
+
+  data.sort((a,b)=>
+    b.name.localeCompare(a.name)
+  );
+
+}
+else {
+
+  const orderMap = {};
+
+  cfg.customOrder.forEach((code,index)=>{
+    orderMap[code] = index;
+  });
+
+  data.sort((a,b)=>{
+
+    const pa = orderMap[a.code] ?? 999999;
+    const pb = orderMap[b.code] ?? 999999;
+
+    return pa - pb;
+
+  });
+
+}
+   
   if ($("thead")) {
     $("thead").innerHTML = `
       <tr style="position: sticky; top: 0; z-index: 20; background: #212529;">
@@ -1992,7 +2139,12 @@ function render() {
         <th colspan="7" style="background: #212529; color: white;">CONFRONTO GLOBALE (TUTTI I MAGAZZINI)</th>
       </tr>
       <tr style="position: sticky; top: 35px; z-index: 20; background: #343a40; color: white; font-size: 0.8rem;">
-        <th>Prodotto</th>
+        <th
+         style="cursor:pointer"
+         onclick="toggleProductSort()"
+         >
+         Prodotto ↕
+         </th>
         <th>U.M.</th>
         <th>Iniziale</th>
         <th>Danni</th>
