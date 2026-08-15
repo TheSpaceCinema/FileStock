@@ -1943,6 +1943,17 @@ for (let [dName, dVal] of Object.entries(distTotals)) {
   return basePezzi + getKitContributionDetail(r.name, r.code);
 }
 
+function toggleProductSort() {
+
+  productSortDirection =
+    productSortDirection === "az"
+      ? "za"
+      : "az";
+
+  render();
+
+}
+
 function render() {
   if (currentTab === 'setup') return;
   if (currentTab === 'candy') { renderCandyView(); return; }
