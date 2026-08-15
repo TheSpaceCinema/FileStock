@@ -2216,7 +2216,45 @@ function updateCount(whIdx, code, type, fieldIdx, val) {
   syncDistributorsToGlobalStock();
   recalcKPIs();
 }
+let inventoryViewConfigs =
+JSON.parse(localStorage.getItem("inventory_view_configs")) || {};
 
+function getInventoryViewConfig() {
+
+  if (!inventoryViewConfigs[cinemaName]) {
+
+    inventoryViewConfigs[cinemaName] = {
+      hiddenProducts: [],
+      customOrder: [],
+      sortMode: "custom"
+    };
+
+  }
+
+  return inventoryViewConfigs[cinemaName];
+}
+
+function saveInventoryViewConfig() {
+
+  localStorage.setItem(
+    "inventory_view_configs",
+    JSON.stringify(inventoryViewConfigs)
+  );
+
+}
+
+function openProductsManager() {
+
+  alert(
+`Funzione in preparazione.
+
+Versione 1:
+✅ Nascondi prodotti
+✅ Riordina prodotti
+✅ Ordinamento alfabetico`
+  );
+
+}
 function recalcKPIs() {
   if (!rows || rows.length === 0) return;
 
