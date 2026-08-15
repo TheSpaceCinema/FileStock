@@ -2168,7 +2168,7 @@ else {
   const tbody = $("tbody");
   if (!tbody) return;
   let html = "";
-  
+  const isTotTab = (currentTab === 'summary');
   data.forEach((r) => {
     let boxVal = 0, sleeveVal = 0, sfusoVal = 0;
     
