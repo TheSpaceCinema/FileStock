@@ -2348,7 +2348,7 @@ function updateRowLiveCalculations(code) {
   const r = rows.find(x => x.code === code);
   if (!r) return;
   
-  const isTotTab = (currentTab === 'summary' || currentTab === 'summary');
+  const isTotTab = (currentTab === 'summary');
   let boxVal = 0, sleeveVal = 0, sfusoVal = 0;
   
   if (!isTotTab && typeof currentTab === 'number') {
