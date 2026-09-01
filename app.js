@@ -607,9 +607,11 @@ function updatePostMixCell(bIdx, r, c, prodName, weight) {
   if (prodName !== null) current.prodName = prodName;
   if (weight !== null) current.weight = weight;
   
-  cfg.blocks[bIdx].gridValues[r][c] = current;
-  savePostMixConfig();
-  recalcKPIs();
+cfg.blocks[bIdx].gridValues[r][c] = current;
+savePostMixConfig();
+recalcKPIs();
+
+switchTab();
 }
 
 function updatePostMixOrientation(val) {
