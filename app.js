@@ -382,9 +382,8 @@ function renderShrinkageView() {
       (rilevato - atteso) *
       n(r.standardCost);
 
-    totaleDanni +=
-      n(r.danni) *
-      n(r.standardCost);
+    totaleDanni -=
+  Math.abs(n(r.danni) * n(r.standardCost));
 
   });
 
