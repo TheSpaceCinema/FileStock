@@ -227,8 +227,8 @@ function getActiveCinemaDistributorConfig() {
     distributorGridConfigs[cinemaName] = {
       distributorsCount: 2,
       distributors: [
-        { id: "dist_0", name: "MARS 1-9", date: "13/08/2026", fondoResti: 35, rows: Array(20).fill().map(() => ({ product: "", stockIniziale: "", ins: ["", "", "", "", ""], contaFinale: "", prezzoVendita: "" })) },
-        { id: "dist_1", name: "MARS 10-18", date: "13/08/2026", fondoResti: 35, rows: Array(20).fill().map(() => ({ product: "", stockIniziale: "", ins: ["", "", "", "", ""], contaFinale: "", prezzoVendita: "" })) }
+        { id: "dist_0", name: "MARS 1-9", date: new Date().toLocaleDateString("it-IT"), fondoResti: 35, rows: Array(20).fill().map(() => ({ product: "", stockIniziale: "", ins: ["", "", "", "", ""], contaFinale: "", prezzoVendita: "" })) },
+        { id: "dist_1", name: "MARS 10-18", date: new Date().toLocaleDateString("it-IT"), fondoResti: 35, rows: Array(20).fill().map(() => ({ product: "", stockIniziale: "", ins: ["", "", "", "", ""], contaFinale: "", prezzoVendita: "" })) }
       ]
     };
   }
