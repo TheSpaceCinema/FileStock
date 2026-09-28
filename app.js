@@ -328,6 +328,20 @@ localStorage.setItem(
   JSON.stringify(postMixProducts)
 );
          localStorage.setItem(
+  "candy_grid_configs",
+  JSON.stringify(candyGridConfigs)
+);
+
+localStorage.setItem(
+  "postmix_grid_configs",
+  JSON.stringify(postMixGridConfigs)
+);
+
+localStorage.setItem(
+  "distributor_grid_configs",
+  JSON.stringify(distributorGridConfigs)
+);
+         localStorage.setItem(
   "size_filename_" + cinemaName,
   f.name
 );
