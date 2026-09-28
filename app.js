@@ -1866,22 +1866,17 @@ function exportCountsBackup() {
 }
 function exportConfigBackup() {
 
-  const data = {
-
-    cinemaName,
-
-    warehouses,
-
-    warehouseTypes,
-
-    warehouseProducts,
-
-    size,
-
-    postMixProducts
-
-  };
-
+const data = {
+  cinemaName,
+  warehouses,
+  warehouseTypes,
+  warehouseProducts,
+  size,
+  postMixProducts,
+  candyGridConfigs,
+  postMixGridConfigs,
+  distributorGridConfigs
+};
   const blob = new Blob(
     [JSON.stringify(data, null, 2)],
     { type: "application/json" }
