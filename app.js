@@ -1262,7 +1262,7 @@ function updateDistributorOrientation(val) {
 function updateDistributorMeta(dIdx, key, val) {
   const cfg = getActiveCinemaDistributorConfig();
   if (cfg.distributors && cfg.distributors[dIdx]) {
-    cfg.distributors[dIdx][key] = key === 'fondoResti' ? parseFloat(val) || 0 : val;
+ cfg.distributors[dIdx][key] = key === 'fondoResti' ? parseFloat(val) || 0 : (key === 'date' && val.includes('-') ? val.split('-').reverse().join('/') : val);
     saveDistributorConfig();
     if (typeof recalcKPIs === 'function') recalcKPIs();
   }
