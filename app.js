@@ -1083,7 +1083,7 @@ function renderDistributorsView() {
         <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:0.85rem;">
           <tr>
             <td style="font-weight:bold; text-align:right; width:30%; padding:2px 5px;">Data:</td>
-            <td style="background:#f1f1f1; text-align:center; font-weight:bold; width:20%; border:1px solid #ccc;">${todayStr}</td>
+           <td style="background:#f1f1f1;border:1px solid #ccc;"><input type="date" value="${(todayStr && todayStr.includes('/')) ? todayStr.split('/').reverse().join('-') : todayStr}" style="width:100%;text-align:center;font-weight:bold;border:none;background:transparent;" onchange="updateDistributorMeta(${dIdx},'date',this.value)"></td>
             <td style="width:10%;"></td>
             <td style="background:#f1c40f; text-align:center; font-weight:bold; border:1px solid #b7950b;" colspan="2">
               <input type="text" value="${esc(d.name || `MARS ${dIdx + 1}`)}" 
