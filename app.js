@@ -2091,27 +2091,9 @@ function resetCounts() {
   // Inventario standard
  countsData = {};
 localStorage.removeItem("inventory_counts");
+saveCountsToStorage();
 
-  // Caramelle
-  delete candyGridConfigs[cinemaName];
-  localStorage.setItem(
-    "candy_grid_configs",
-    JSON.stringify(candyGridConfigs)
-  );
-
-  // Post Mix
-  delete postMixGridConfigs[cinemaName];
-  localStorage.setItem(
-    "postmix_grid_configs",
-    JSON.stringify(postMixGridConfigs)
-  );
-
-  // Distributori
-  delete distributorGridConfigs[cinemaName];
-  localStorage.setItem(
-    "distributor_grid_configs",
-    JSON.stringify(distributorGridConfigs)
-  );
+render();
    }
 function showHiddenProducts() {
 
