@@ -1926,7 +1926,15 @@ function importConfigBackup(input) {
 
     postMixProducts =
       data.postMixProducts || [];
+   candyGridConfigs =
+  data.candyGridConfigs || {};
 
+   postMixGridConfigs =
+  data.postMixGridConfigs || {};
+
+   distributorGridConfigs =
+  data.distributorGridConfigs || {};
+     
     localStorage.setItem(
       "cinema_info_name",
       cinemaName
