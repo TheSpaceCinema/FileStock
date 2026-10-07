@@ -24,6 +24,8 @@ JSON.parse(
   localStorage.getItem("hidden_products")
 ) || {};
 let showHiddenMode = false;
+let summaryGlobalRedFilter = false;
+let summaryProductRedFilter = false;
 const MAX_FIELDS = 10;
 
 /* --- ALERT AMMANCHI: SOGLIE GLOBALI PROTETTE --- */
@@ -105,6 +107,22 @@ function makeProductAlertIcons(r,diffVal,ctx) {
   const gTitle=Number.isFinite(globalPct) ? `● Ammanco € ${fmtMoney(shortage)} | Venduto totale a costo € ${fmtMoney(ctx.soldTotal)} | Incidenza ${globalPct.toFixed(2)}%` : "● Incidenza globale non calcolabile: venduto totale a costo pari a zero";
   const pTitle=Number.isFinite(productPct) ? `◆ Ammanco € ${fmtMoney(shortage)} | Venduto prodotto a costo € ${fmtMoney(productSold)} | Incidenza ${productPct.toFixed(2)}%` : "◆ Critico: ammanco rilevato senza vendite associate al prodotto";
   return `<span class="alert-indicators">${makeAlertIcon("circle",globalPct,gLevel,gTitle)}${makeAlertIcon("diamond",productPct,pLevel,pTitle)}</span>`;
+}
+
+function getProductAlertLevels(r, diffVal, ctx) {
+  if (diffVal >= 0) return { globalLevel: "none", productLevel: "none" };
+  if (!ctx.ready) return { globalLevel: "gray", productLevel: "gray" };
+
+  const thresholds = getAlertThresholds();
+  const shortage = Math.abs(diffVal);
+  const globalPct = ctx.soldTotal > 0 ? (shortage / ctx.soldTotal) * 100 : NaN;
+  const productSold = Math.max(0, n(r.venduto)) * Math.max(0, n(r.standardCost));
+  const productPct = productSold > 0 ? (shortage / productSold) * 100 : NaN;
+
+  return {
+    globalLevel: getAlertLevel(globalPct, thresholds.globalGreen, thresholds.globalYellow),
+    productLevel: productSold > 0 ? getAlertLevel(productPct, thresholds.productGreen, thresholds.productYellow) : "red"
+  };
 }
 
 const DEFAULT_CINEMAS = [
@@ -3038,6 +3056,62 @@ document.addEventListener("keydown", function(e) {
   }
 
 });
+function toggleSummaryGlobalRedFilter() {
+  summaryGlobalRedFilter = !summaryGlobalRedFilter;
+  render();
+}
+
+function toggleSummaryProductRedFilter() {
+  summaryProductRedFilter = !summaryProductRedFilter;
+  render();
+}
+
+function printFilteredSummary() {
+  if (currentTab !== "summary") {
+    alert("La stampa filtrata è disponibile solo nel Riepilogo Totale.");
+    return;
+  }
+  document.body.classList.add("printing-summary");
+  window.print();
+  setTimeout(() => document.body.classList.remove("printing-summary"), 500);
+}
+
+function updateSummaryFilterControls() {
+  const toolbar = document.querySelector(".toolbar");
+  if (!toolbar) return;
+
+  let controls = document.getElementById("summaryAlertFilterControls");
+  if (currentTab !== "summary") {
+    if (controls) controls.style.display = "none";
+    return;
+  }
+
+  if (!controls) {
+    controls = document.createElement("div");
+    controls.id = "summaryAlertFilterControls";
+    controls.style.cssText = "display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;padding-top:10px;border-top:1px solid #ddd;";
+    controls.innerHTML = `
+      <button id="summaryGlobalRedBtn" type="button" class="btn btn-secondary" onclick="toggleSummaryGlobalRedFilter()">● Rossi sul venduto totale</button>
+      <button id="summaryProductRedBtn" type="button" class="btn btn-secondary" onclick="toggleSummaryProductRedFilter()">◆ Rossi sul prodotto</button>
+      <button id="printFilteredSummaryBtn" type="button" class="btn btn-primary" onclick="printFilteredSummary()">🖨️ Stampa risultato</button>
+    `;
+    toolbar.appendChild(controls);
+  }
+
+  controls.style.display = "flex";
+  const globalBtn = document.getElementById("summaryGlobalRedBtn");
+  const productBtn = document.getElementById("summaryProductRedBtn");
+
+  if (globalBtn) {
+    globalBtn.className = summaryGlobalRedFilter ? "btn btn-danger" : "btn btn-secondary";
+    globalBtn.textContent = summaryGlobalRedFilter ? "✓ ● Solo rossi sul venduto totale" : "● Rossi sul venduto totale";
+  }
+  if (productBtn) {
+    productBtn.className = summaryProductRedFilter ? "btn btn-danger" : "btn btn-secondary";
+    productBtn.textContent = summaryProductRedFilter ? "✓ ◆ Solo rossi sul prodotto" : "◆ Rossi sul prodotto";
+  }
+}
+
 function toggleProductSort() {
 
   productSortDirection =
@@ -3109,6 +3183,8 @@ function toggleProductVisibility(code) {
 }
 
 function render() {
+  updateSummaryFilterControls();
+
   if (currentTab === 'setup') return;
   if (currentTab === 'candy') { renderCandyView(); return; }
   if (currentTab === 'postmix') { renderPostMixView(); return; }
@@ -3132,6 +3208,22 @@ data = data.filter(
 );
 
 }
+if (
+  currentTab === "summary" &&
+  (summaryGlobalRedFilter || summaryProductRedFilter)
+) {
+  const filterAlertCtx = getAlertContext();
+  data = data.filter(r => {
+    const effettivo = getGlobalRilevato(r.code, r);
+    const diff = effettivo - n(r.atteso);
+    const diffVal = diff * n(r.standardCost);
+    const levels = getProductAlertLevels(r, diffVal, filterAlertCtx);
+    if (summaryGlobalRedFilter && levels.globalLevel !== "red") return false;
+    if (summaryProductRedFilter && levels.productLevel !== "red") return false;
+    return true;
+  });
+}
+
 if (productSortDirection === "az") {
   data.sort((a,b) =>
     a.name.localeCompare(b.name)

@@ -121,6 +121,28 @@
     .threshold-field { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:7px 0; }
     .threshold-field input { width:90px; padding:6px; text-align:right; border:1px solid #bbb; border-radius:4px; }
     .threshold-note { color:#666; font-size:.85rem; }
+  
+    /* STAMPA RIEPILOGO FILTRATO */
+    @media print {
+      body.printing-summary { background:#fff !important; padding:0 !important; }
+      body.printing-summary .header,
+      body.printing-summary .tabs-bar,
+      body.printing-summary .toolbar,
+      body.printing-summary .kpi-container,
+      body.printing-summary #filesSection,
+      body.printing-summary #mainStatus,
+      body.printing-summary #setupView { display:none !important; }
+      body.printing-summary .container { width:100% !important; max-width:100% !important; margin:0 !important; padding:0 !important; }
+      body.printing-summary #tabContent { display:block !important; }
+      body.printing-summary .table-container { display:block !important; width:100% !important; max-height:none !important; overflow:visible !important; box-shadow:none !important; padding:0 !important; margin:0 !important; }
+      body.printing-summary table { width:100% !important; border-collapse:collapse !important; font-size:7.5pt !important; }
+      body.printing-summary thead { display:table-header-group; }
+      body.printing-summary th { position:static !important; }
+      body.printing-summary tr { break-inside:avoid; page-break-inside:avoid; }
+      body.printing-summary button { display:none !important; }
+      body.printing-summary th, body.printing-summary td { padding:4px !important; }
+      @page { size:landscape; margin:8mm; }
+    }
   </style>
 </head>
 <body>
